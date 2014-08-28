@@ -1,6 +1,8 @@
 #entomic
 =======
 
+Clojure library for datomic, allows you to express queries as entities.
+
 Warning - library is in the early stages of alpha!
 
 ## Motivation
