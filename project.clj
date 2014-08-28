@@ -6,4 +6,4 @@
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [com.datomic/datomic-free "0.9.4880.2" :scope "test"]
                  [clj-time "0.6.0"]]
-  :offline? true)
+  :offline? false)
