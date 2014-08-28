@@ -38,9 +38,11 @@ I.e. just take your existing datom and apply the entomic function "f" to it.
 
 ## The Entomic API
 
-This is in the early stages of development and, so far, only has functions for querying datomic. They all involve the same core code and just vary by whether they decorate the returned entities or check for uniqueness.
+This is in the early stages of development and, so far, only has functions for querying datomic as well as setting the datomic api and connection. They all involve the same core code and just vary by whether they decorate the returned entities or check for uniqueness.
 
 ```clj
+resolve-api! [ns] ;; sets the datomic api that entomic will use
+set-connection! [conn] ;; set the datomic connection that entomic will use
 f [entity] ;;returns a seq of decorated entities
 fu [entity] ;;returns a decorated entity, throws if not unique
 ids [entity] ;;returns the result-set
