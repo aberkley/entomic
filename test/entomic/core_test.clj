@@ -87,17 +87,17 @@
               :collection/user (d/tempid :db.part/user -3)
               :collection/book (d/tempid :db.part/user -2)}])
 
-(every? identity
-        [(is (= "Excession" (:book/title (e/fu {:book/isbn "9876543210"}))))
-         (is (= nil         (:book/title (e/fu {:book/isbn "987654321"}))))
-         (is (= "Dune"      (:book/title (e/fu {:book/rating '(> 9M)}))))
-         (is (= "Excession" (:book/title (e/fu {:book/rating '[(> 6M) (< 9M)]}))))
-         (is (= nil         (:book/title (e/fu {:book/rating '[(> 6M) (< 7M)]}))))
-         (is (= "Excession" (:book/title (e/fu {'(bigdec :book/isbn) 9876543210M}))))
-         (is (= "Excession" (:book/title (e/fu {'(bigdec :book/isbn) '(> 1234567890)}))))
-         (is (= "Excession" (:book/title (:collection/book
-                                          (e/fu {:collection/user {:user/name "Alex"}})))))
-         (is (= "Dune"      (:book/title (e/fu
-                                          {:book/title #{"Dune" "Excession"}
-                                           :book/rating '(> 4M)
-                                           :book/author #{"Frank Herbert" "Tom Smith"}}))))])
+(deftest query
+  (is (= "Excession" (:book/title (e/fu {:book/isbn "9876543210"}))))
+  (is (= nil         (:book/title (e/fu {:book/isbn "987654321"}))))
+  (is (= "Dune"      (:book/title (e/fu {:book/rating '(> 9M)}))))
+  (is (= "Excession" (:book/title (e/fu {:book/rating '[(> 6M) (< 9M)]}))))
+  (is (= nil         (:book/title (e/fu {:book/rating '[(> 6M) (< 7M)]}))))
+  (is (= "Excession" (:book/title (e/fu {'(bigdec :book/isbn) 9876543210M}))))
+  (is (= "Excession" (:book/title (e/fu {'(bigdec :book/isbn) '(> 1234567890)}))))
+  (is (= "Excession" (:book/title (:collection/book
+                                   (e/fu {:collection/user {:user/name "Alex"}})))))
+  (is (= "Dune"      (:book/title (e/fu
+                                   {:book/title #{"Dune" "Excession"}
+                                    :book/rating '(> 4M)
+                                    :book/author #{"Frank Herbert" "Tom Smith"}})))))
