@@ -1,5 +1,6 @@
-#entomic
-=======
+#entomic 
+
+[![Build Status](https://travis-ci.org/aberkley/entomic.svg?branch=master)](https://travis-ci.org/aberkley/entomic)
 
 Clojure library for datomic, allows you to express queries as entities.
 
