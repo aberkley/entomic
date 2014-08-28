@@ -100,4 +100,14 @@
   (is (= "Dune"      (:book/title (e/fu
                                    {:book/title #{"Dune" "Excession"}
                                     :book/rating '(> 4M)
-                                    :book/author #{"Frank Herbert" "Tom Smith"}})))))
+                                    :book/author #{"Frank Herbert" "Tom Smith"}}))))
+  (is (boolean (e/id {:book/isbn "9876543210"})))
+  (is (boolean (seq (ids {:book/isbn "9876543210"}))))
+  (is (e/f? {:book/isbn "9876543210"}))
+  (is (e/fu? {:book/isbn "9876543210"})))
+
+(comment
+  (e/f? {:book/title #{"Dune" "Excession"}
+         :book/rating '(> 4M)
+         :book/author #{"Frank Herbert" "Tom Smith"}})
+  )

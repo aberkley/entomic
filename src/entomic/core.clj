@@ -124,7 +124,7 @@
   (into [:find '?entity :where]
         (entity-wheres '?entity entity)))
 
-(defn ids
+(defn- find-ids
   [database entity]
   (let [[entity' sets] (extract-sets entity)]
     (if (seq sets)
@@ -136,26 +136,31 @@
       (-> (entity-query entity)
           (@q database)))))
 
-(defn id
+(defn- find-id
   [database entity]
-  (let [ids (ids database entity)]
-    (case (count ids)
+  (let [ids' (find-ids database entity)]
+    (case (count ids')
       0 nil
-      1 (first (first ids))
+      1 (first (first ids'))
       :else (throw (Exception. "more than 1 entity id found")))))
 
+(defn ids
+  [entity]
+  (find-ids (@db @conn) entity))
+
+(defn id
+  [entity]
+  (find-id (@db @conn) entity))
+
 (defn f?
-  [database entity]
+  [entity]
   (boolean
-   (seq (ids database entity))))
+   (seq (ids entity))))
 
 (defn fu?
-  [database entity]
-  (let [ids (ids database entity)]
-    (case (count ids)
-      0 false
-      1 true
-      :else (throw (Exception. (str "multiple entities found for: " entity))))))
+  [entity]
+  (boolean
+   (find-id (@db @conn) entity)))
 
 (defn- decorate-entity
   [database entity']
@@ -245,7 +250,7 @@
   [partial-entity]
   (let [database (@db @conn)]
     (->> partial-entity
-         (ids database)
+         (find-ids database)
          (entities database))))
 
 (defn fu [x]
