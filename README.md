@@ -1,10 +1,27 @@
-#entomic 
-
-[![Build Status](https://travis-ci.org/aberkley/entomic.svg?branch=master)](https://travis-ci.org/aberkley/entomic)
+#Entomic 
 
 Clojure library for datomic, allows you to express queries as entities.
 
 Warning - library is in the early stages of alpha!
+
+[![Build Status](https://travis-ci.org/aberkley/entomic.svg?branch=master)](https://travis-ci.org/aberkley/entomic)
+
+* Leiningen 
+```clj  
+[org.clojars.aberkley/entomic "0.1.0-SNAPSHOT"]
+```
+* Gradle 
+```  
+compile "org.clojars.aberkley:entomic:0.1.0-SNAPSHOT"
+```
+* Maven
+```xml
+<dependency>
+  <groupId>org.clojars.aberkley</groupId>
+  <artifactId>entomic</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
 
 ## Motivation
 
