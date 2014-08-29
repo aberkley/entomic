@@ -104,10 +104,15 @@
   (is (boolean (e/id {:book/isbn "9876543210"})))
   (is (boolean (seq (ids {:book/isbn "9876543210"}))))
   (is (e/f? {:book/isbn "9876543210"}))
-  (is (e/fu? {:book/isbn "9876543210"})))
-
-(comment
-  (e/f? {:book/title #{"Dune" "Excession"}
-         :book/rating '(> 4M)
-         :book/author #{"Frank Herbert" "Tom Smith"}})
-  )
+  (is (e/fu? {:book/isbn "9876543210"}))
+  (is (boolean (e/update! [{:book/title "Dune" :book/isbn "9999999999"}] [:book/title])))
+  (is (e/fu? {:book/isbn "9999999999"}))
+  (is (boolean (e/update! [{:book/title "Dune" :book/isbn "1111111111"}])))
+  (is (= 2 (count (ids {:book/title "Dune"}))))
+  (is (nil? (e/save! [{:book/title "Excession" :book/isbn "2222222222"}] [:book/title])))
+  (is (nil? (e/save! [{:book/title "Excession"
+                       :book/author "Iain M. Banks"
+                       :book/publishing-date (c/to-date
+                                              (t/date-time 2003 5 28))
+                       :book/isbn "9876543210"
+                       :book/rating 8.2M}]))))

@@ -139,10 +139,10 @@
 (defn- find-id
   [database entity]
   (let [ids' (find-ids database entity)]
-    (case (count ids')
-      0 nil
-      1 (first (first ids'))
-      :else (throw (Exception. "more than 1 entity id found")))))
+    (cond
+     (= 0 (count ids')) nil
+     (= 1 (count ids')) (first (first ids'))
+     :else (throw (Exception. (str "more than 1 entity id found for " entity))))))
 
 (defn ids
   [entity]
@@ -181,52 +181,6 @@
        (map (partial @entity database))
        (map (partial decorate-entity database))))
 
-(comment
-  (defn-db entity-to-save
-    [entity keys]
-    (if (:db/id entity)
-      entity
-      (if-let [e (fu? (select-keys entity keys))]
-        nil
-        (tempid :db.part/db))))
-
-  (defn entity-to-update
-    [entity keys])
-
-  (defn-db group-entities
-    [database entities unique-queries]
-    (let [eqs (map (fn [e q] [e q]) entities unique-queries)
-          eqs-by-id (group-by (fn [[e q]] (contains? e :db/id)) eqs)
-          with-new-ids (->> (get eqs-by-id true)
-                            (map first)
-                            (#(or % [])))
-          without-new-ids (get eqs-by-id false)
-          existing-ids (->> without-new-ids
-                            (map second)
-                            (map #(d/q % database))
-                            (map (comp first first)))
-          existing-id-set (->> existing-ids
-                               (filter identity)
-                               (into #{}))
-          with-ids (map (fn [[e q] i] (assoc e :db/id (or i (d/tempid :db.part/user)))) without-new-ids existing-ids)
-          with-ids-by-existing (group-by #(contains? existing-id-set (:db/id %)) with-ids)]
-      {:with-new-ids with-new-ids
-       :with-temp-ids (get with-ids-by-existing false)
-       :with-existing-ids (get with-ids-by-existing true)}))
-
-  (defn-db transaction-update
-    [database entities unique-queries]
-    (->> (group-entities database entities unique-queries)
-         vals
-         flatten
-         (filter identity)))
-
-  (defn-db transaction-save
-    [database entities unique-queries]
-    (let [{:keys [with-new-ids with-temp-ids with-existing-ids]} (group-entities database entities unique-queries)]
-      (filter identity
-              (flatten [with-new-ids with-temp-ids])))))
-
 (defn retract [attribute' entities]
   "retracts given attribute of given entities"
   (->> entities
@@ -261,14 +215,47 @@
       0 nil
       (throw (Exception. (str "more than one entity found for: " x))))))
 
-(comment
-
-
-  )
-
 (defn retract-entities
   [entities]
   (->> entities
        (map :db/id)
        (map (fn [id] `[:db.fn/retractEntity ~id]))
-       (transact conn)))
+       (@transact @conn)))
+
+(defn- key-id
+  [database entity keys]
+  {:pre (every? identity (map entity keys))}
+  (let [entity' (if (seq keys)
+                  (select-keys entity keys)
+                  (dissoc entity :db/id))]
+    (if (seq entity')
+      (find-id database entity')
+      (find-id database entity))))
+
+(defn- entity-id
+  [database update-not-save? entity keys]
+ (if-let [id' (:db/id entity)]
+    id'
+    (if-let [id'' (key-id database entity keys)]
+      (if update-not-save? id'' nil)
+      (@tempid :db.part/user))))
+
+(defn- commit!
+  [update-not-save? entities keys]
+  (let [entities' (->> entities
+              (map #(assoc % :db/id (entity-id (@db @conn) update-not-save? % keys)))
+              (filter :db/id))]
+    (if (seq entities')
+      (@transact @conn entities'))))
+
+(defn save!
+  ([entities]
+     (save! entities []))
+  ([entities keys]
+     (commit! false entities keys)))
+
+(defn update!
+  ([entities]
+     (update! entities []))
+  ([entities keys]
+     (commit! true entities keys)))
