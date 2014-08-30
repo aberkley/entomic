@@ -115,4 +115,14 @@
                        :book/publishing-date (c/to-date
                                               (t/date-time 2003 5 28))
                        :book/isbn "9876543210"
-                       :book/rating 8.2M}]))))
+                       :book/rating 8.2M}])))
+  (is (boolean (e/retract :book/rating [{:book/title "Excession"
+                                  :book/rating 8.2M}]
+                   [:book/title])))
+  (is (nil? (:book/rating (e/fu {:book/title "Excession"}))))
+  (is (boolean (e/retract-entities [{:book/title "Excession"}] [:book/title])))
+  (is (nil? (e/fu {:book/title "Excession"})))
+  (is (boolean (e/retract-entities [{:book/title "Dune"
+                                     :book/author "Frank Herbert"}])))
+  (is (nil? (e/fu {:book/title "Dune"
+                  :book/author "Frank Herbert"}))))

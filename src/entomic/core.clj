@@ -181,12 +181,35 @@
        (map (partial @entity database))
        (map (partial decorate-entity database))))
 
-(defn retract [attribute' entities]
-  "retracts given attribute of given entities"
+(defn- key-id
+  [database entity keys]
+  {:pre (every? identity (map entity keys))}
+  (let [entity' (if (seq keys)
+                  (select-keys entity keys)
+                  (dissoc entity :db/id))]
+    (if (seq entity')
+      (find-id database entity')
+      (find-id database entity))))
+
+(defn- entity-id
+  [database include-existing? keys entity]
+ (if-let [id' (:db/id entity)]
+    id'
+    (if-let [id'' (key-id database entity keys)]
+      (if include-existing? id'' nil)
+      (@tempid :db.part/user))))
+
+(defn- merge-entity-ids
+  [database include-existing? keys entities]
   (->> entities
-       (filter attribute')
-       (map (fn [e] [:db/retract (:db/id e) attribute' (attribute' e)]))
-       (@transact conn)))
+       (map #(assoc % :db/id (entity-id database include-existing? keys %)))
+       (filter :db/id)))
+
+(defn- commit!
+  [include-existing? entities keys]
+  (let [entities' (merge-entity-ids (@db @conn) include-existing? keys entities)]
+    (if (seq entities')
+      (@transact @conn entities'))))
 
 (defn- dispatch-find
   [x]
@@ -215,39 +238,6 @@
       0 nil
       (throw (Exception. (str "more than one entity found for: " x))))))
 
-(defn retract-entities
-  [entities]
-  (->> entities
-       (map :db/id)
-       (map (fn [id] `[:db.fn/retractEntity ~id]))
-       (@transact @conn)))
-
-(defn- key-id
-  [database entity keys]
-  {:pre (every? identity (map entity keys))}
-  (let [entity' (if (seq keys)
-                  (select-keys entity keys)
-                  (dissoc entity :db/id))]
-    (if (seq entity')
-      (find-id database entity')
-      (find-id database entity))))
-
-(defn- entity-id
-  [database update-not-save? entity keys]
- (if-let [id' (:db/id entity)]
-    id'
-    (if-let [id'' (key-id database entity keys)]
-      (if update-not-save? id'' nil)
-      (@tempid :db.part/user))))
-
-(defn- commit!
-  [update-not-save? entities keys]
-  (let [entities' (->> entities
-              (map #(assoc % :db/id (entity-id (@db @conn) update-not-save? % keys)))
-              (filter :db/id))]
-    (if (seq entities')
-      (@transact @conn entities'))))
-
 (defn save!
   ([entities]
      (save! entities []))
@@ -259,3 +249,26 @@
      (update! entities []))
   ([entities keys]
      (commit! true entities keys)))
+
+(defn retract
+  ([attribute' entities keys]
+     "retracts given attribute of given entities"
+     (let [database (@db @conn)]
+       (->> entities
+            (filter attribute')
+            (merge-entity-ids database true keys)
+            (map (fn [e] [:db/retract (:db/id e) attribute' (attribute' e)]))
+            (@transact @conn))))
+  ([attribute' entities]
+     (retract attribute' entities [])))
+
+(defn retract-entities
+  ([entities keys]
+      (let [database (@db @conn)]
+        (->> entities
+             (merge-entity-ids database true keys)
+             (map :db/id)
+             (map (fn [id] `[:db.fn/retractEntity ~id]))
+             (@transact @conn))))
+  ([entities]
+     (retract-entities entities [])))
