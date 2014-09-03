@@ -17,6 +17,10 @@
 
 (defonce tempid (atom nil))
 
+(defonce function (atom nil))
+
+(defonce transactional-entities (atom nil))
+
 (defn find-api-function
   [ns symbol']
   (->> ns
@@ -34,11 +38,33 @@
          (reset! entity (find-api-function ns 'entity))
          (reset! transact (find-api-function ns 'transact))
          (reset! conn (find-api-function ns 'conn))
-         (reset! tempid (find-api-function ns 'tempid))))))
+         (reset! tempid (find-api-function ns 'tempid))
+         (reset! function (find-api-function ns 'function))
+         (reset! transactional-entities
+                 (@function '{:lang :clojure
+                              :params [database q tempid id-type f entities key-queries]
+                              :code (let [entity-id (fn [entity key-query]
+                                                      (let [{query :query rules :rules} key-query
+                                                            existing-id (ffirst (q query database rules))
+                                                            temp-id (tempid :db.part/user)]
+                                                        (or (:db/id entity)
+                                                            (case id-type
+                                                              :update  (or existing-id temp-id)
+                                                              :save    (if-not existing-id temp-id)
+                                                              :retract existing-id))))]
+                                      (->> [entities key-queries]
+                                           (apply (partial map (fn [e kq] (assoc e :db/id (entity-id e kq)))))
+                                           (filter :db/id)
+                                           (map f)))}))))))
 
 (defn set-connection!
   [conn']
-  (reset! conn conn'))
+  (let [ident :transactional-entities]
+    (do
+      (reset! conn conn')
+      (@transact @conn [{:db/id (@tempid :db.part/user)
+                         :db/ident :transactional-entities
+                         :db/fn @transactional-entities}]))))
 
 (defn- find-attribute
   [form]
@@ -119,22 +145,20 @@
        (map (fn [rule] (into '[[entity? ?entity]] rule)))
        vec))
 
-(defn- entity-query
-  [entity]
-  (into [:find '?entity :where]
-        (entity-wheres '?entity entity)))
+(defn- entity-query-and-rules
+  [entity sets]
+  {:query '[:find ?entity
+            :in $ %
+            :where (entity? ?entity)]
+   :rules (rules entity sets)})
 
 (defn- find-ids
   [database entity]
-  (let [[entity' sets] (extract-sets entity)]
-    (if (seq sets)
-      (@q '[:find ?entity
-            :in $ %
-            :where (entity? ?entity)]
-          database
-          (rules entity' sets))
-      (-> (entity-query entity)
-          (@q database)))))
+  (let [[entity' sets] (extract-sets entity)
+        {query :query rules' :rules} (entity-query-and-rules entity' sets)]
+    (@q query
+        database
+        rules')))
 
 (defn- find-id
   [database entity]
@@ -181,35 +205,20 @@
        (map (partial @entity database))
        (map (partial decorate-entity database))))
 
-(defn- key-id
-  [database entity keys]
+(defn- key-query
+  [keys entity]
   {:pre (every? identity (map entity keys))}
   (let [entity' (if (seq keys)
                   (select-keys entity keys)
-                  (dissoc entity :db/id))]
-    (if (seq entity')
-      (find-id database entity')
-      (find-id database entity))))
-
-(defn- entity-id
-  [database include-existing? keys entity]
- (if-let [id' (:db/id entity)]
-    id'
-    (if-let [id'' (key-id database entity keys)]
-      (if include-existing? id'' nil)
-      (@tempid :db.part/user))))
-
-(defn- merge-entity-ids
-  [database include-existing? keys entities]
-  (->> entities
-       (map #(assoc % :db/id (entity-id database include-existing? keys %)))
-       (filter :db/id)))
+                  (dissoc entity :db/id))
+        entity'' (if (seq entity') entity' entity)]
+    (apply entity-query-and-rules (extract-sets entity''))))
 
 (defn- commit!
-  [include-existing? entities keys]
-  (let [entities' (merge-entity-ids (@db @conn) include-existing? keys entities)]
-    (if (seq entities')
-      (@transact @conn entities'))))
+  [id-type f entities keys]
+  (let [queries (map (partial key-query keys) entities)]
+    (if (seq entities)
+      (@transact @conn [[:transactional-entities @q @tempid id-type f entities queries]]))))
 
 (defn- dispatch-find
   [x]
@@ -242,33 +251,30 @@
   ([entities]
      (save! entities []))
   ([entities keys]
-     (commit! false entities keys)))
+     (commit! :save identity entities keys)))
 
 (defn update!
   ([entities]
      (update! entities []))
   ([entities keys]
-     (commit! true entities keys)))
+     (commit! :update identity entities keys)))
 
-(defn retract
-  ([attribute' entities keys]
-     "retracts given attribute of given entities"
-     (let [database (@db @conn)]
-       (->> entities
-            (filter attribute')
-            (merge-entity-ids database true keys)
-            (map (fn [e] [:db/retract (:db/id e) attribute' (attribute' e)]))
-            (@transact @conn))))
+(defn- retract-transaction
+  [attribute entity]
+  [:db/retract (:db/id entity) attribute (attribute entity)])
+
+(defn- retract-entity-transaction
+  [entity]
+  [:db.fn/retractEntity (:db/id entity)])
+
+(defn retract!
+  ([attribute entities keys]
+     (commit! :retract (partial retract-transaction attribute) (filter attribute entities) keys))
   ([attribute' entities]
-     (retract attribute' entities [])))
+     (retract! attribute' entities [])))
 
-(defn retract-entities
+(defn retract-entities!
   ([entities keys]
-      (let [database (@db @conn)]
-        (->> entities
-             (merge-entity-ids database true keys)
-             (map :db/id)
-             (map (fn [id] `[:db.fn/retractEntity ~id]))
-             (@transact @conn))))
+     (commit! :retract retract-entity-transaction entities keys))
   ([entities]
-     (retract-entities entities [])))
+     (retract-entities! entities [])))
