@@ -1,8 +1,7 @@
 (ns entomic.core
   (:use clojure.pprint))
 
-;; TODO: 1 - parse and unparse entities based on type of attribute. Ref types are resolved in the db if not an id
-;; TODO: 2 - write update/save (as u/s) where key attributes are passed in (no extended schema)
+
 ;; TODO: 3 - include attribute manipulating functions
 
 (defonce q (atom nil))

@@ -1,9 +1,10 @@
-(ns entomic.core-test
-  (:use     [entomic.core :as e])
+(ns entomic.test
   (:require [clojure.test :refer :all]
             [datomic.api :only [q db] :as d]
             [clj-time.core :as t]
-            [clj-time.coerce :as c]))
+            [clj-time.coerce :as c]
+            [entomic.core :as e]
+            [entomic.format :as f]))
 
 (e/resolve-api! (find-ns 'datomic.api))
 
@@ -102,29 +103,57 @@
                                     :book/rating '(> 4M)
                                     :book/author #{"Frank Herbert" "Tom Smith"}}))))
   (is (boolean (e/id {:book/isbn "9876543210"})))
-  (is (boolean (seq (ids {:book/isbn "9876543210"}))))
+  (is (boolean (seq (e/ids {:book/isbn "9876543210"}))))
   (is (e/f? {:book/isbn "9876543210"}))
   (is (e/fu? {:book/isbn "9876543210"}))
   (is (boolean (e/update! [{:book/title "Dune" :book/isbn "9999999999"}] [:book/title])))
-  (is (= 1 (count (ids {:book/title "Dune"}))))
+  (is (= 1 (count (e/ids {:book/title "Dune"}))))
   (is (e/fu? {:book/isbn "9999999999"}))
-  (is (boolean (e/update! [{:book/title "Dune" :book/isbn "1111111111"}])))
-  (is (= 2 (count (ids {:book/title "Dune"}))))
+  (is (boolean (e/update! [{:book/title "Dune" :book/isbn "1111111111" :book/publishing-date (c/to-date
+                                                                                              (t/date-time 2002 4 12))}])))
+  (is (= 2 (count (e/ids {:book/title "Dune"}))))
   (is (boolean (e/save! [{:book/title "Excession" :book/isbn "2222222222"}] [:book/title])))
   (is (boolean (e/save! [{:book/title "Excession"
-                       :book/author "Iain M. Banks"
-                       :book/publishing-date (c/to-date
-                                              (t/date-time 2003 5 28))
-                       :book/isbn "9876543210"
+                          :book/author "Iain M. Banks"
+                          :book/publishing-date (c/to-date
+                                                 (t/date-time 2003 5 28))
+                          :book/isbn "9876543210"
                           :book/rating 8.2M}])))
-  (is (= 1 (count (ids {:book/title "Excession"}))))
+  (is (= 1 (count (e/ids {:book/title "Excession"}))))
   (is (boolean (e/retract! :book/rating [{:book/title "Excession"
-                                  :book/rating 8.2M}]
-                   [:book/title])))
+                                          :book/rating 8.2M}]
+                           [:book/title])))
   (is (nil? (:book/rating (e/fu {:book/title "Excession"}))))
   (is (boolean (e/retract-entities! [{:book/title "Excession"}] [:book/title])))
   (is (nil? (e/fu {:book/title "Excession"})))
   (is (boolean (e/retract-entities! [{:book/title "Dune"
-                                     :book/author "Frank Herbert"}])))
+                                      :book/author "Frank Herbert"}])))
   (is (nil? (e/fu {:book/title "Dune"
-                  :book/author "Frank Herbert"}))))
+                   :book/author "Frank Herbert"})))
+  (is (= java.lang.Long
+         (type
+          (:collection/user
+           (f/parse-entity
+            {:collection/user {:user/name "Alex"}
+             :collection/book {:book/title "Excession"}})))))
+  (is (= java.math.BigDecimal
+         (type
+          (:book/rating
+           (f/parse-entity
+            {:book/rating "9.5"
+             :db/id 17592186045420})))))
+  (is (= java.lang.String
+         (type
+          (:book/isbn
+           (f/parse-entity
+            {:book/isbn 1234567890})))))
+  (is (= java.util.Date
+         (type
+          (:book/publishing-date
+           (f/parse-entity
+            {:book/publishing-date (clj-time.core/date-time 2014 1 1)})))))
+  (is (= org.joda.time.DateTime
+         (type
+          (:book/publishing-date
+           (f/unparse-entity (e/fu {:book/title "Dune"}))))))
+  (is (nil? (f/unparse-entity nil))))
