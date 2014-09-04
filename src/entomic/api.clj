@@ -7,24 +7,32 @@
 (def id e/id)
 
 (defn f?
-  [entity]
-  (boolean
-   (seq (e/ids entity))))
+  [partial-entity]
+  (->> partial-entity
+       ft/custom-parse-entity
+       e/ids
+       seq
+       boolean))
 
 (defn fu?
-  [entity]
-  (= 1
-     (count (e/ids entity))))
+  [partial-entity]
+  (->> partial-entity
+       ft/custom-parse-entity
+       e/ids
+       count
+       (= 1)))
 
 (defn f
   [partial-entity]
   (->> partial-entity
+       ft/custom-parse-entity
        e/f-raw
        ft/unparse))
 
 (defn fu
   [partial-entity]
   (->> partial-entity
+       ft/custom-parse-entity
        e/fu-raw
        ft/unparse-entity))
 

@@ -5,15 +5,25 @@
 
 ;; TODO: 1 - parse and unparse entities based on type of attribute. Ref types are resolved in the db if not an id
 
+(defonce custom-parsers (atom {}))
+
+(defn set-custom-parser!
+  [attributes function]
+  (swap! custom-parsers (partial reduce (fn [m a] (assoc m a function))) attributes))
+
 (defn- attribute-types
   [entity]
-  (->> entity
-       keys
-       (into #{})
-       (assoc {} :db/ident)
-       e/f-raw
-       (map (juxt :db/ident :db/valueType))
-       (into {})))
+  (let [keyset (->> entity
+                    keys
+                    (filter keyword?)
+                    (into #{}))]
+    (if (seq keyset)
+      (->> keyset
+           (assoc {} :db/ident)
+           e/f-raw
+           (map (juxt :db/ident :db/valueType))
+           (into {}))
+      {})))
 
 (def type-map
   {:db.type/bigdec  [java.math.BigDecimal bigdec]
@@ -22,11 +32,23 @@
    :db.type/instant [java.util.Date c/to-date]
    :db.type/ref     [java.lang.Long (comp :db/id e/fu-raw)]})
 
+(defn- custom-parse-value
+  [a-map k v]
+  (if-let [f (@custom-parsers k)]
+    (let [v' ((k @custom-parsers) v)]
+     (if-let [id (:db/id v')]
+       id
+       v'))
+    v))
+
 (defn- parse-value
   [a-map k v]
   (let [d-type (k a-map)
         [t f] (if d-type (type-map d-type) [nil identity])
-        f'    (if (= (type v) t) identity f)]
+        f'    (cond
+               (k @custom-parsers) (comp :db/id (k @custom-parsers))
+               (= (type v) t) identity
+               :else f)]
     (f' v)))
 
 (defn- unparse-value
@@ -43,6 +65,8 @@
            (into [])
            (map (fn [[k v]] [k (f a-map k v)]))
            (into {})))))
+
+(def custom-parse-entity (partial modify-entity-values custom-parse-value))
 
 (def parse-entity (partial modify-entity-values parse-value))
 

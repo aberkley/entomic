@@ -19,6 +19,22 @@
 
 (e/set-connection! conn')
 
+(defprotocol User
+  (user-of [this]))
+
+(extend-protocol User
+  java.lang.Number
+  (user-of [p-id]
+    (a/fu {:db/id p-id}))
+  java.lang.String
+  (user-of [p-name]
+    (a/fu {:user/name p-name}))
+  java.lang.Object
+  (user-of [this]
+    (a/fu this)))
+
+(f/set-custom-parser! [:collection/user] user-of)
+
 (d/transact conn'
  [{:db/id (d/tempid :db.part/db)
    :db/ident :book/title
@@ -158,5 +174,12 @@
           (:book/publishing-date
            (f/unparse-entity {:book/publishing-date (c/to-date (t/date-time 2014 1 1))})))))
   (is (nil? (f/unparse-entity nil)))
-  ;;(e/fu {:book/title})
-  )
+  (is (= java.lang.Long
+         (type
+          (:collection/user
+           (f/parse-entity {:collection/user "Alex"})))))
+  (is (boolean (a/save! [{:book/title "The Player Of Games"
+                          :book/author "Iain M. Banks"}])))
+  (is (boolean (a/save! [{:collection/user "Alex"
+                          :collection/book {:book/title "The Player Of Games"}}])))
+  (is (= 2 (count (a/f {:collection/user "Alex"})))))
