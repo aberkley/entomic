@@ -1,7 +1,6 @@
 (ns entomic.core
   (:use clojure.pprint))
 
-
 ;; TODO: 3 - include attribute manipulating functions
 
 (defonce q (atom nil))
@@ -167,24 +166,6 @@
      (= 1 (count ids')) (first (first ids'))
      :else (throw (Exception. (str "more than 1 entity id found for " entity))))))
 
-(defn ids
-  [entity]
-  (find-ids (@db @conn) entity))
-
-(defn id
-  [entity]
-  (find-id (@db @conn) entity))
-
-(defn f?
-  [entity]
-  (boolean
-   (seq (ids entity))))
-
-(defn fu?
-  [entity]
-  (boolean
-   (find-id (@db @conn) entity)))
-
 (defn- decorate-entity
   [database entity']
   (let [entity'' {:db/id (:db/id entity')}
@@ -213,67 +194,33 @@
         entity'' (if (seq entity') entity' entity)]
     (apply entity-query-and-rules (extract-sets entity''))))
 
-(defn- commit!
+(defn transact!
   [id-type f entities keys]
   (let [queries (map (partial key-query keys) entities)]
     (if (seq entities)
       (@transact @conn [[:transactional-entities @q @tempid id-type f entities queries]]))))
 
-(defn- dispatch-find
-  [x]
-  (cond
-   (:db/id x) :id
-   (map? x)   :partial-entity))
-
-(defmulti f "finds entities given a query (as an entity)" dispatch-find)
-
-(defmethod f :id
-  [{id :db/id}]
-  (entities (@db @conn) [[id]]))
-
-(defmethod f :partial-entity
+(defn f-raw
   [partial-entity]
   (let [database (@db @conn)]
-    (->> partial-entity
-         (find-ids database)
-         (entities database))))
+    (if-let [id (:db/id partial-entity)]
+      (entities (@db @conn) [[id]])
+      (->> partial-entity
+           (find-ids database)
+           (entities database)))))
 
-(defn fu [x]
+(defn fu-raw [x]
   "finds a single entity in datomic given a query (as an entity). Multiple results throws an exception."
-  (let [entities (f x)]
+  (let [entities (f-raw x)]
     (case (count entities)
       1 (first entities)
       0 nil
       (throw (Exception. (str "more than one entity found for: " x))))))
 
-(defn save!
-  ([entities]
-     (save! entities []))
-  ([entities keys]
-     (commit! :save identity entities keys)))
-
-(defn update!
-  ([entities]
-     (update! entities []))
-  ([entities keys]
-     (commit! :update identity entities keys)))
-
-(defn- retract-transaction
-  [attribute entity]
-  [:db/retract (:db/id entity) attribute (attribute entity)])
-
-(defn- retract-entity-transaction
+(defn ids
   [entity]
-  [:db.fn/retractEntity (:db/id entity)])
+  (find-ids (@db @conn) entity))
 
-(defn retract!
-  ([attribute entities keys]
-     (commit! :retract (partial retract-transaction attribute) (filter attribute entities) keys))
-  ([attribute' entities]
-     (retract! attribute' entities [])))
-
-(defn retract-entities!
-  ([entities keys]
-     (commit! :retract retract-entity-transaction entities keys))
-  ([entities]
-     (retract-entities! entities [])))
+(defn id
+  [entity]
+  (find-id (@db @conn) entity))

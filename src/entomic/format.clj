@@ -11,7 +11,7 @@
        keys
        (into #{})
        (assoc {} :db/ident)
-       e/f
+       e/f-raw
        (map (juxt :db/ident :db/valueType))
        (into {})))
 
@@ -20,7 +20,7 @@
    :db.type/string  [java.lang.String str]
    :db.type/bigint  [clojure.lang.BigInt bigint]
    :db.type/instant [java.util.Date c/to-date]
-   :db.type/ref     [java.lang.Long (comp :db/id e/fu)]})
+   :db.type/ref     [java.lang.Long (comp :db/id e/fu-raw)]})
 
 (defn- parse-value
   [a-map k v]

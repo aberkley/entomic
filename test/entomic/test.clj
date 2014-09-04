@@ -4,7 +4,8 @@
             [clj-time.core :as t]
             [clj-time.coerce :as c]
             [entomic.core :as e]
-            [entomic.format :as f]))
+            [entomic.format :as f]
+            [entomic.api :as a]))
 
 (e/resolve-api! (find-ns 'datomic.api))
 
@@ -89,46 +90,46 @@
               :collection/book (d/tempid :db.part/user -2)}])
 
 (deftest query
-  (is (= "Excession" (:book/title (e/fu {:book/isbn "9876543210"}))))
-  (is (= nil         (:book/title (e/fu {:book/isbn "987654321"}))))
-  (is (= "Dune"      (:book/title (e/fu {:book/rating '(> 9M)}))))
-  (is (= "Excession" (:book/title (e/fu {:book/rating '[(> 6M) (< 9M)]}))))
-  (is (= nil         (:book/title (e/fu {:book/rating '[(> 6M) (< 7M)]}))))
-  (is (= "Excession" (:book/title (e/fu {'(bigdec :book/isbn) 9876543210M}))))
-  (is (= "Excession" (:book/title (e/fu {'(bigdec :book/isbn) '(> 1234567890)}))))
+  (is (= "Excession" (:book/title (a/fu {:book/isbn "9876543210"}))))
+  (is (= nil         (:book/title (a/fu {:book/isbn "987654321"}))))
+  (is (= "Dune"      (:book/title (a/fu {:book/rating '(> 9M)}))))
+  (is (= "Excession" (:book/title (a/fu {:book/rating '[(> 6M) (< 9M)]}))))
+  (is (= nil         (:book/title (a/fu {:book/rating '[(> 6M) (< 7M)]}))))
+  (is (= "Excession" (:book/title (a/fu {'(bigdec :book/isbn) 9876543210M}))))
+  (is (= "Excession" (:book/title (a/fu {'(bigdec :book/isbn) '(> 1234567890)}))))
   (is (= "Excession" (:book/title (:collection/book
-                                   (e/fu {:collection/user {:user/name "Alex"}})))))
-  (is (= "Dune"      (:book/title (e/fu
+                                   (a/fu {:collection/user {:user/name "Alex"}})))))
+  (is (= "Dune"      (:book/title (a/fu
                                    {:book/title #{"Dune" "Excession"}
                                     :book/rating '(> 4M)
                                     :book/author #{"Frank Herbert" "Tom Smith"}}))))
-  (is (boolean (e/id {:book/isbn "9876543210"})))
-  (is (boolean (seq (e/ids {:book/isbn "9876543210"}))))
-  (is (e/f? {:book/isbn "9876543210"}))
-  (is (e/fu? {:book/isbn "9876543210"}))
-  (is (boolean (e/update! [{:book/title "Dune" :book/isbn "9999999999"}] [:book/title])))
-  (is (= 1 (count (e/ids {:book/title "Dune"}))))
-  (is (e/fu? {:book/isbn "9999999999"}))
-  (is (boolean (e/update! [{:book/title "Dune" :book/isbn "1111111111" :book/publishing-date (c/to-date
+  (is (boolean (a/id {:book/isbn "9876543210"})))
+  (is (boolean (seq (a/ids {:book/isbn "9876543210"}))))
+  (is (a/f? {:book/isbn "9876543210"}))
+  (is (a/fu? {:book/isbn "9876543210"}))
+  (is (boolean (a/update! [{:book/title "Dune" :book/isbn "9999999999"}] [:book/title])))
+  (is (= 1 (count (a/ids {:book/title "Dune"}))))
+  (is (a/fu? {:book/isbn "9999999999"}))
+  (is (boolean (a/update! [{:book/title "Dune" :book/isbn "1111111111" :book/publishing-date (c/to-date
                                                                                               (t/date-time 2002 4 12))}])))
-  (is (= 2 (count (e/ids {:book/title "Dune"}))))
-  (is (boolean (e/save! [{:book/title "Excession" :book/isbn "2222222222"}] [:book/title])))
-  (is (boolean (e/save! [{:book/title "Excession"
+  (is (= 2 (count (a/ids {:book/title "Dune"}))))
+  (is (boolean (a/save! [{:book/title "Excession" :book/isbn "2222222222"}] [:book/title])))
+  (is (boolean (a/save! [{:book/title "Excession"
                           :book/author "Iain M. Banks"
                           :book/publishing-date (c/to-date
                                                  (t/date-time 2003 5 28))
                           :book/isbn "9876543210"
                           :book/rating 8.2M}])))
-  (is (= 1 (count (e/ids {:book/title "Excession"}))))
-  (is (boolean (e/retract! :book/rating [{:book/title "Excession"
+  (is (= 1 (count (a/ids {:book/title "Excession"}))))
+  (is (boolean (a/retract! :book/rating [{:book/title "Excession"
                                           :book/rating 8.2M}]
                            [:book/title])))
-  (is (nil? (:book/rating (e/fu {:book/title "Excession"}))))
-  (is (boolean (e/retract-entities! [{:book/title "Excession"}] [:book/title])))
-  (is (nil? (e/fu {:book/title "Excession"})))
-  (is (boolean (e/retract-entities! [{:book/title "Dune"
+  (is (nil? (:book/rating (a/fu {:book/title "Excession"}))))
+  (is (boolean (a/retract-entities! [{:book/title "Excession"}] [:book/title])))
+  (is (nil? (a/fu {:book/title "Excession"})))
+  (is (boolean (a/retract-entities! [{:book/title "Dune"
                                       :book/author "Frank Herbert"}])))
-  (is (nil? (e/fu {:book/title "Dune"
+  (is (nil? (a/fu {:book/title "Dune"
                    :book/author "Frank Herbert"})))
   (is (= java.lang.Long
          (type
@@ -155,5 +156,7 @@
   (is (= org.joda.time.DateTime
          (type
           (:book/publishing-date
-           (f/unparse-entity (e/fu {:book/title "Dune"}))))))
-  (is (nil? (f/unparse-entity nil))))
+           (f/unparse-entity {:book/publishing-date (c/to-date (t/date-time 2014 1 1))})))))
+  (is (nil? (f/unparse-entity nil)))
+  ;;(e/fu {:book/title})
+  )
