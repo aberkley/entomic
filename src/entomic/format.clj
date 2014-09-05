@@ -49,7 +49,9 @@
                (k @custom-parsers) (comp :db/id (k @custom-parsers))
                (= (type v) t) identity
                :else f)]
-    (f' v)))
+    (if f'
+      (f' v)
+      v)))
 
 (defn- unparse-value
   [a-map k v]
