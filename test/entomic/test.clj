@@ -72,6 +72,12 @@
    :db/cardinality :db.cardinality/one
    :db.install/_attribute :db.part/db}
   {:db/id (d/tempid :db.part/db)
+   :db/ident :user/type
+   :db/valueType :db.type/keyword
+   :db/cardinality :db.cardinality/one
+   :db.install/_attribute :db.part/db}
+  [:db/add #db/id[:db.part/user] :db/ident :user.type/charity]
+  {:db/id (d/tempid :db.part/db)
    :db/ident :collection/user
    :db/valueType :db.type/ref
    :db/cardinality :db.cardinality/one
@@ -182,4 +188,6 @@
                           :book/author "Iain M. Banks"}])))
   (is (boolean (a/save! [{:collection/user "Alex"
                           :collection/book {:book/title "The Player Of Games"}}])))
-  (is (= 2 (count (a/f {:collection/user "Alex"})))))
+  (is (= 2 (count (a/f {:collection/user "Alex"}))))
+  (is (boolean (a/save! [{:user/name "Book Club" :user/type :user.type/charity}])))
+  (is (boolean (a/fu {:user/type :user.type/charity}))))
