@@ -36,9 +36,17 @@
        e/fu-raw
        ft/unparse-entity))
 
-(defn commit!
+(defn- commits!
+  [id-types fs entities keys]
+  (e/transact! id-types fs (ft/parse entities) keys))
+
+(defn- commit!
   [id-type f entities keys]
-  (e/transact! id-type f (ft/parse entities) keys))
+  (let [n (count entities)]
+    (commits! (repeat n id-type)
+              (repeat n f)
+              entities
+              keys)))
 
 (defn save!
   ([entities]

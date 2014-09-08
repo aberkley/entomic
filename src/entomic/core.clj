@@ -40,8 +40,8 @@
          (reset! function (find-api-function ns 'function))
          (reset! transactional-entities
                  (@function '{:lang :clojure
-                              :params [database q tempid id-type f entities key-queries]
-                              :code (let [entity-id (fn [entity key-query]
+                              :params [database q tempid id-types fs entities key-queries]
+                              :code (let [entity-id (fn [id-type f entity key-query]
                                                       (let [{query :query rules :rules} key-query
                                                             existing-id (ffirst (q query database rules))
                                                             temp-id (tempid :db.part/user)]
@@ -50,10 +50,19 @@
                                                               :update  (or existing-id temp-id)
                                                               :save    (if-not existing-id temp-id)
                                                               :retract existing-id))))]
-                                      (->> [entities key-queries]
-                                           (apply (partial map (fn [e kq] (assoc e :db/id (entity-id e kq)))))
-                                           (filter :db/id)
-                                           (map f)))}))))))
+                                      (->> [id-types fs entities key-queries]
+                                           (apply (partial map (fn [id-type' f' entity' key-query']
+                                                                 (let [id (entity-id id-type' f' entity' key-query')]
+                                                                   (if id (f' (assoc entity' :db/id id)))))))
+                                           (filter identity)))}))))))
+
+(defn- retract-transaction
+  [attribute entity]
+  [:db/retract (:db/id entity) attribute (attribute entity)])
+
+(defn- retract-entity-transaction
+  [entity]
+  [:db.fn/retractEntity (:db/id entity)])
 
 (defn set-connection!
   [conn']
@@ -195,10 +204,10 @@
     (apply entity-query-and-rules (extract-sets entity''))))
 
 (defn transact!
-  [id-type f entities keys]
+  [id-types fs entities keys]
   (let [queries (map (partial key-query keys) entities)]
     (if (seq entities)
-      (@transact @conn [[:transactional-entities @q @tempid id-type f entities queries]]))))
+      (@transact @conn [[:transactional-entities @q @tempid id-types fs entities queries]]))))
 
 (defn f-raw
   [partial-entity]
