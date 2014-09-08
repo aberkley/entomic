@@ -36,6 +36,14 @@
        e/fu-raw
        ft/unparse-entity))
 
+(defn- retract-transaction
+  [attribute entity]
+  [:db/retract (:db/id entity) attribute (attribute entity)])
+
+(defn- retract-entity-transaction
+  [entity]
+  [:db.fn/retractEntity (:db/id entity)])
+
 (defn- commits!
   [id-types fs entities keys]
   (e/transact! id-types fs (ft/parse entities) keys))
@@ -59,14 +67,6 @@
      (update! entities []))
   ([entities keys]
      (commit! :update identity entities keys)))
-
-(defn- retract-transaction
-  [attribute entity]
-  [:db/retract (:db/id entity) attribute (attribute entity)])
-
-(defn- retract-entity-transaction
-  [entity]
-  [:db.fn/retractEntity (:db/id entity)])
 
 (defn retract!
   ([attribute entities keys]

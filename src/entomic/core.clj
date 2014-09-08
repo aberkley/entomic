@@ -56,14 +56,6 @@
                                                                    (if id (f' (assoc entity' :db/id id)))))))
                                            (filter identity)))}))))))
 
-(defn- retract-transaction
-  [attribute entity]
-  [:db/retract (:db/id entity) attribute (attribute entity)])
-
-(defn- retract-entity-transaction
-  [entity]
-  [:db.fn/retractEntity (:db/id entity)])
-
 (defn set-connection!
   [conn']
   (let [ident :transactional-entities]
