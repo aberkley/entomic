@@ -48,34 +48,47 @@
   [id-types fs entities keys]
   (e/transact! id-types fs (ft/parse entities) keys))
 
-(defn- commit!
-  [id-type f entities keys]
-  (let [n (count entities)]
-    (commits! (repeat n id-type)
-              (repeat n f)
-              entities
-              keys)))
+(defn- expand-and-merge-args
+  [cum [id-type entities key attribute]]
+  (let [key' (or key [])
+        f (case id-type
+            :retract-entities retract-entity-transaction
+            :retract (partial retract-transaction attribute)
+            identity)]
+    (->> entities
+         (map (fn [entity] [id-type f entity key']))
+         (into cum))))
+
+(defn as-transaction!
+  [& args]
+  (apply commits!
+   (apply map vector
+          (reduce expand-and-merge-args [] args))))
+
+(defmacro transaction!
+  [& args]
+  `(apply ~as-transaction! '~args))
 
 (defn save!
+  ([entities key]
+     (as-transaction! [:save entities key]))
   ([entities]
-     (save! entities []))
-  ([entities keys]
-     (commit! :save identity entities keys)))
+     (save! entities [])))
 
 (defn update!
   ([entities]
      (update! entities []))
-  ([entities keys]
-     (commit! :update identity entities keys)))
+  ([entities key]
+     (as-transaction! [:update entities key])))
 
 (defn retract!
-  ([attribute entities keys]
-     (commit! :retract (partial retract-transaction attribute) (filter attribute entities) keys))
-  ([attribute' entities]
-     (retract! attribute' entities [])))
+  ([entities key attribute]
+     (as-transaction! [:retract (filter attribute entities) key attribute]))
+  ([entities attribute]
+     (retract! entities [] attribute)))
 
 (defn retract-entities!
-  ([entities keys]
-     (commit! :retract retract-entity-transaction entities keys))
+  ([entities key]
+     (as-transaction! [:retract-entities entities key]))
   ([entities]
      (retract-entities! entities [])))

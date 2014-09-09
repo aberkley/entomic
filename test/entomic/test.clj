@@ -111,7 +111,7 @@
               :collection/user (d/tempid :db.part/user -3)
               :collection/book (d/tempid :db.part/user -2)}])
 
-(deftest query
+(deftest test-query
   (is (= "Excession" (:book/title (a/fu {:book/isbn "9876543210"}))))
   (is (= nil         (:book/title (a/fu {:book/isbn "987654321"}))))
   (is (= "Dune"      (:book/title (a/fu {:book/rating '(> 9M)}))))
@@ -143,9 +143,10 @@
                           :book/isbn "9876543210"
                           :book/rating 8.2M}])))
   (is (= 1 (count (a/ids {:book/title "Excession"}))))
-  (is (boolean (a/retract! :book/rating [{:book/title "Excession"
-                                          :book/rating 8.2M}]
-                           [:book/title])))
+  (is (boolean (a/retract! [{:book/title "Excession"
+                             :book/rating 8.2M}]
+                           [:book/title]
+                           :book/rating)))
   (is (nil? (:book/rating (a/fu {:book/title "Excession"}))))
   (is (boolean (a/retract-entities! [{:book/title "Excession"}] [:book/title])))
   (is (nil? (a/fu {:book/title "Excession"})))
@@ -190,4 +191,25 @@
                           :collection/book {:book/title "The Player Of Games"}}])))
   (is (= 2 (count (a/f {:collection/user "Alex"}))))
   (is (boolean (a/save! [{:user/name "Book Club" :user/type :user.type/charity}])))
-  (is (boolean (a/fu {:user/type :user.type/charity}))))
+  (is (boolean (a/fu {:user/type :user.type/charity})))
+  (is (boolean (a/save! [{:book/title "Neuromancer" :book/author "William Gibson" :book/isbn "1122334455"}])))
+  (is (boolean
+       (a/as-transaction!
+        [:update [{:book/title "Neuromancer" :book/rating "9.5"}] [:book/title]]
+        [:retract [{:book/title "Neuromancer" :book/isbn "1122334455"}] [:book/title] :book/isbn])))
+  (is (boolean (a/fu {:book/title "Neuromancer"})))
+  (is (= 9.5M (:book/rating (a/fu {:book/title "Neuromancer"}))))
+  (is (nil? (:book/isbn (a/fu {:book/title "Neuromancer"}))))
+  (is (boolean
+       (a/transaction!
+        (:retract-entities [{:book/title "Neuromancer" :book/author "William Gibson" :book/isbn "1122334455"}])))))
+
+(comment
+  (a/transaction!
+   (:update [{:book/title "Dunes" :book/rating "8.3"} {:book/author "Frank Herberts"}] [:book/title :book/author]))
+
+  (a/f {:book/title "Neuromancer"})
+
+
+
+  )

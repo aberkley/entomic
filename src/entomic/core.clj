@@ -49,12 +49,27 @@
                                                             (case id-type
                                                               :update  (or existing-id temp-id)
                                                               :save    (if-not existing-id temp-id)
-                                                              :retract existing-id))))]
+                                                              :retract existing-id
+                                                              :retract-entities existing-id))))]
                                       (->> [id-types fs entities key-queries]
                                            (apply (partial map (fn [id-type' f' entity' key-query']
                                                                  (let [id (entity-id id-type' f' entity' key-query')]
                                                                    (if id (f' (assoc entity' :db/id id)))))))
                                            (filter identity)))}))))))
+
+(comment
+
+  (let [e1 {:book/title "Dune" :book/rating 9.4M}
+        e2 {:book/title "Dune"}]
+   (@transactional-entities (@db @conn)
+                            @q
+                            @tempid
+                            [:update :retract]
+                            [identity entomic.api/retract-entity-transaction-]
+                            [e1 e2]
+                            [(key-query [:book/title] e1) (key-query [:book/title] e2)]))
+
+  )
 
 (defn set-connection!
   [conn']
@@ -187,17 +202,17 @@
        (map (partial decorate-entity database))))
 
 (defn- key-query
-  [keys entity]
-  {:pre (every? identity (map entity keys))}
-  (let [entity' (if (seq keys)
-                  (select-keys entity keys)
+  [entity key]
+  {:pre (every? identity (map entity key))}
+  (let [entity' (if (seq key)
+                  (select-keys entity key)
                   (dissoc entity :db/id))
         entity'' (if (seq entity') entity' entity)]
     (apply entity-query-and-rules (extract-sets entity''))))
 
 (defn transact!
   [id-types fs entities keys]
-  (let [queries (map (partial key-query keys) entities)]
+  (let [queries (map key-query entities keys)]
     (if (seq entities)
       (@transact @conn [[:transactional-entities @q @tempid id-types fs entities queries]]))))
 
