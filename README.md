@@ -28,7 +28,7 @@ You may wish to know whether it already exists in the database. So you would nee
   [?book :book/format "Paperback"]]
 ```  
   
-This is essentially what entomic does - takes an entity and converts it into a datomic query. To find the entity above in the database, you would simply apply the Entomic function "f" to the datom. You may get more than result, depending on how many entities have those values.
+This is essentially what entomic does - takes an entity and converts it into a datomic query. To find the entity above in the database, you would simply apply the Entomic function f (for "find") to the datom. You may get more than one result, depending on how many entities have those values.
 
 ```clj
 (f {:book/title "Dune"
@@ -38,9 +38,9 @@ This is essentially what entomic does - takes an entity and converts it into a d
 
 More generally, Entomic allows you to express queries as entities, which has several advantages:
 
-1) Entities and queries have the same representation so can be used interchangably.
-2) Queries can be created and manipulated in a more Clojure-idiomatic way - they're just Clojure maps
-3) Querying is generally more concise
+* Entities and queries have the same representation so can be used interchangably.
+* Queries can be created and manipulated in a more Clojure-idiomatic way - they're just Clojure maps
+* Querying is generally more concise
 
 ## The Entomic API
 
