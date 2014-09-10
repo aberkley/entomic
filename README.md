@@ -6,22 +6,7 @@ Warning - library is in the early stages of alpha!
 
 [![Build Status](https://travis-ci.org/aberkley/entomic.svg?branch=master)](https://travis-ci.org/aberkley/entomic)
 
-* Leiningen 
-```clj  
-[org.clojars.aberkley/entomic "0.1.0-SNAPSHOT"]
-```
-* Gradle 
-```  
-compile "org.clojars.aberkley:entomic:0.1.0-SNAPSHOT"
-```
-* Maven
-```xml
-<dependency>
-  <groupId>org.clojars.aberkley</groupId>
-  <artifactId>entomic</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
-</dependency>
-```
+You can see the latest version on [clojars] (https://clojars.org/org.clojars.aberkley/entomic)
 
 ## Motivation
 
