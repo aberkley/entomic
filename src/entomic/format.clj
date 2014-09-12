@@ -85,11 +85,6 @@
   [d-type k v]
   ((unparser d-type) v))
 
-(defn- custom-parse-value
-  [d-type k v]
-  ((or (custom-parser k)
-       identity) v))
-
 (defn- modify-entity-values
   [f entity]
   (if entity
@@ -98,8 +93,6 @@
            (into [])
            (map (fn [[k v]] [k (f (get a-map k) k v)]))
            (into {})))))
-
-(def custom-parse-entity (partial modify-entity-values custom-parse-value))
 
 (def parse-entity (partial modify-entity-values parse-value))
 

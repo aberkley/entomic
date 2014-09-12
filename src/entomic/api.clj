@@ -9,7 +9,7 @@
 (defn f?
   [partial-entity]
   (->> partial-entity
-       ft/custom-parse-entity
+       ft/parse-entity
        e/ids
        seq
        boolean))
@@ -17,7 +17,7 @@
 (defn fu?
   [partial-entity]
   (->> partial-entity
-       ft/custom-parse-entity
+       ft/parse-entity
        e/ids
        count
        (= 1)))
@@ -25,16 +25,30 @@
 (defn f
   [partial-entity]
   (->> partial-entity
-       ft/custom-parse-entity
+       ft/parse-entity
        e/f-raw
        ft/unparse))
 
 (defn fu
   [partial-entity]
   (->> partial-entity
-       ft/custom-parse-entity
+       ft/parse-entity
        e/fu-raw
        ft/unparse-entity))
+
+(comment
+  (a/transaction!
+   (:update [{:book/title "Dunes" :book/rating "8.3"} {:book/author "Frank Herberts"}] [:book/title :book/author]))
+
+  (a/f {:book/title "Neuromancer"})
+
+  (e/fu-raw {:user/dob #inst "1981-10-14T00:00:00.000-00:00"})
+
+  (fu {:user/dob
+           (clj-time.core/date-time 1981 10 14)})
+
+  )
+
 
 (defn- retract-transaction
   [attribute entity]

@@ -202,4 +202,5 @@
   (is (nil? (:book/isbn (a/fu {:book/title "Neuromancer"}))))
   (is (boolean
        (a/transaction!
-        (:retract-entities [{:book/title "Neuromancer" :book/author "William Gibson" :book/isbn "1122334455"}])))))
+        (:retract-entities [{:book/title "Neuromancer" :book/author "William Gibson" :book/isbn "1122334455"}]))))
+  (is (boolean (a/fu {:user/dob (t/date-time 1981 10 14)}))))
