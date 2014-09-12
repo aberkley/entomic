@@ -40,12 +40,28 @@
   [x]
   (or (string? x) (number? x)))
 
+(defn all-types? [x] true)
+
+(defprotocol Ref
+  (parse-ref [x]))
+
+(extend-protocol Ref
+  java.lang.Long
+  (parse-ref [x]
+    x)
+  clojure.lang.Keyword
+  (parse-ref [x]
+    {:db/ident x})
+  java.lang.Object
+  (parse-ref [x]
+    (-> x e/fu-raw :db/id)))
+
 (def parse-map
   {:db.type/bigdec  [string-or-number? bigdec]
    :db.type/string  [number? str]
    :db.type/bigint  [string-or-number? bigint]
    :db.type/instant [(type-match? [org.joda.time.DateTime org.joda.time.LocalDate]) c/to-date]
-   :db.type/ref     [(not-type-match? [java.lang.Long clojure.lang.Keyword]) (comp :db/id e/fu-raw)]
+   :db.type/ref     [all-types? parse-ref]
    :db.type/keyword [string? keyword]})
 
 (def unparse-map

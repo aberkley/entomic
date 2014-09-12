@@ -73,7 +73,7 @@
    :db.install/_attribute :db.part/db}
   {:db/id (d/tempid :db.part/db)
    :db/ident :user/type
-   :db/valueType :db.type/keyword
+   :db/valueType :db.type/ref
    :db/cardinality :db.cardinality/one
    :db.install/_attribute :db.part/db}
   [:db/add #db/id[:db.part/user] :db/ident :user.type/charity]
