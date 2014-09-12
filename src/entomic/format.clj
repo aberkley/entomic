@@ -25,39 +25,70 @@
            (into {}))
       {})))
 
-(def type-map
-  {:db.type/bigdec  [java.math.BigDecimal bigdec]
-   :db.type/string  [java.lang.String str]
-   :db.type/bigint  [clojure.lang.BigInt bigint]
-   :db.type/instant [java.util.Date c/to-date]
-   :db.type/ref     [java.lang.Long (comp :db/id e/fu-raw)]})
+(defn not-type-match?
+  [types]
+  (fn [x]
+    (->> types
+         (map #(= (type x) %))
+         (not-any? identity))))
 
-(defn- custom-parse-value
-  [a-map k v]
-  (if-let [f (@custom-parsers k)]
-    (let [v' ((k @custom-parsers) v)]
-     (if-let [id (:db/id v')]
-       id
-       v'))
-    v))
+(defn type-match?
+  [types]
+  (complement (not-type-match? types)))
+
+(defn string-or-number?
+  [x]
+  (or (string? x) (number? x)))
+
+(def parse-map
+  {:db.type/bigdec  [string-or-number? bigdec]
+   :db.type/string  [number? str]
+   :db.type/bigint  [string-or-number? bigint]
+   :db.type/instant [(type-match? [org.joda.time.DateTime org.joda.time.LocalDate]) c/to-date]
+   :db.type/ref     [(not-type-match? [java.lang.Long clojure.lang.Keyword]) (comp :db/id e/fu-raw)]
+   :db.type/keyword [string? keyword]})
+
+(def unparse-map
+  {:db.type/instant c/to-date-time})
+
+(defn custom-parser
+  [k]
+  (if-let [p (get @custom-parsers k)]
+    (comp :db/id p)))
+
+(defn default-parser
+  [d-type k v]
+  (if d-type
+    (if-let [[pred parser] (d-type parse-map)]
+      (if (and (keyword? k)
+               (pred v))
+        parser))))
+
+(defn- parser
+  [d-type k v]
+  (or (custom-parser k)
+      (default-parser d-type k v)
+      identity))
 
 (defn- parse-value
-  [a-map k v]
-  (let [d-type (k a-map)
-        [t f] (if d-type (type-map d-type) [nil identity])
-        f'    (cond
-               (k @custom-parsers) (comp :db/id (k @custom-parsers))
-               (= (type v) t) identity
-               :else f)]
-    (if f'
-      (f' v)
-      v)))
+  [d-type k v]
+  ((parser d-type k v) v))
+
+(defn- unparser
+  [d-type]
+  (if d-type
+    (or (d-type unparse-map)
+        identity)
+    identity))
 
 (defn- unparse-value
-  [a-map k v]
-  (if (= (k a-map) :db.type/instant)
-    (c/to-date-time v)
-    v))
+  [d-type k v]
+  ((unparser d-type) v))
+
+(defn- custom-parse-value
+  [d-type k v]
+  ((or (custom-parser k)
+       identity) v))
 
 (defn- modify-entity-values
   [f entity]
@@ -65,7 +96,7 @@
     (let [a-map (attribute-types entity)]
       (->> entity
            (into [])
-           (map (fn [[k v]] [k (f a-map k v)]))
+           (map (fn [[k v]] [k (f (get a-map k) k v)]))
            (into {})))))
 
 (def custom-parse-entity (partial modify-entity-values custom-parse-value))

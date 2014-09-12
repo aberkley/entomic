@@ -203,13 +203,3 @@
   (is (boolean
        (a/transaction!
         (:retract-entities [{:book/title "Neuromancer" :book/author "William Gibson" :book/isbn "1122334455"}])))))
-
-(comment
-  (a/transaction!
-   (:update [{:book/title "Dunes" :book/rating "8.3"} {:book/author "Frank Herberts"}] [:book/title :book/author]))
-
-  (a/f {:book/title "Neuromancer"})
-
-
-
-  )
