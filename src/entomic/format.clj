@@ -5,6 +5,13 @@
 
 ;; TODO: 1 - parse and unparse entities based on type of attribute. Ref types are resolved in the db if not an id
 
+(defn verify-unique
+  [in out]
+  (case (count out)
+      1 (first out)
+      0 nil
+      (throw (Exception. (str "more than one entity found for: " in)))))
+
 (defonce custom-parsers (atom {}))
 
 (defn set-custom-parser!
@@ -20,7 +27,7 @@
     (if (seq keyset)
       (->> keyset
            (assoc {} :db/ident)
-           e/f-raw
+           e/find
            (map (juxt :db/ident :db/valueType))
            (into {}))
       {})))
@@ -54,7 +61,10 @@
     {:db/ident x})
   java.lang.Object
   (parse-ref [x]
-    (-> x e/fu-raw :db/id)))
+    (->> x
+         e/find
+         (verify-unique x)
+         :db/id)))
 
 (def parse-map
   {:db.type/bigdec  [string-or-number? bigdec]
@@ -103,12 +113,14 @@
 
 (defn- modify-entity-values
   [f entity]
-  (if entity
-    (let [a-map (attribute-types entity)]
-      (->> entity
-           (into [])
-           (map (fn [[k v]] [k (f (get a-map k) k v)]))
-           (into {})))))
+  (try
+   (if entity
+     (let [a-map (attribute-types entity)]
+       (->> entity
+            (into [])
+            (map (fn [[k v]] [k (f (get a-map k) k v)]))
+            (into {}))))
+   (catch Exception e entity)))
 
 (def parse-entity (partial modify-entity-values parse-value))
 

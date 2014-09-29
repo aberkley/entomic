@@ -1,54 +1,45 @@
 (ns entomic.api
-  (:require [entomic.core :only [transact! f-raw find-ids find-id] :as e]
-            [entomic.format :only [parse unparse unparse-entity] :as ft]))
+  (:require [entomic.core :only [transact! find find-ids] :as e]
+            [entomic.format :only [parse unparse unparse-entity verify-unique] :as ft]))
 
-(def ids e/ids)
+(defn ids
+  [x]
+  (->> x
+       ft/parse-entity
+       e/find-ids))
 
-(def id e/id)
+(defn id
+  [x]
+  (->> x
+       ids
+       (ft/verify-unique x)))
 
 (defn f?
-  [partial-entity]
-  (->> partial-entity
-       ft/parse-entity
-       e/ids
+  [x]
+  (->> x
+       ids
        seq
        boolean))
 
 (defn fu?
-  [partial-entity]
-  (->> partial-entity
-       ft/parse-entity
-       e/ids
+  [x]
+  (->> x
+       ids
        count
        (= 1)))
 
 (defn f
-  [partial-entity]
-  (->> partial-entity
+  [x]
+  (->> x
        ft/parse-entity
-       e/f-raw
+       e/find
        ft/unparse))
 
 (defn fu
-  [partial-entity]
-  (->> partial-entity
-       ft/parse-entity
-       e/fu-raw
-       ft/unparse-entity))
-
-(comment
-  (a/transaction!
-   (:update [{:book/title "Dunes" :book/rating "8.3"} {:book/author "Frank Herberts"}] [:book/title :book/author]))
-
-  (a/f {:book/title "Neuromancer"})
-
-  (e/fu-raw {:user/dob #inst "1981-10-14T00:00:00.000-00:00"})
-
-  (fu {:user/dob
-           (clj-time.core/date-time 1981 10 14)})
-
-  )
-
+  [x]
+  (->> x
+       f
+       (ft/verify-unique x)))
 
 (defn- retract-transaction
   [attribute entity]

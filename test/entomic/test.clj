@@ -129,6 +129,7 @@
   (is (boolean (seq (a/ids {:book/isbn "9876543210"}))))
   (is (a/f? {:book/isbn "9876543210"}))
   (is (a/fu? {:book/isbn "9876543210"}))
+  (is (= 2 (count (a/f :book))))
   (is (boolean (a/update! [{:book/title "Dune" :book/isbn "9999999999"}] [:book/title])))
   (is (= 1 (count (a/ids {:book/title "Dune"}))))
   (is (a/fu? {:book/isbn "9999999999"}))

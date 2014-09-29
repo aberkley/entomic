@@ -1,7 +1,11 @@
 (ns entomic.core
-  (:use clojure.pprint))
+  (:use clojure.pprint
+        entomic.coerce))
 
 ;; TODO: 3 - include attribute manipulating functions
+
+(def rule-query
+  )
 
 (defonce q (atom nil))
 
@@ -40,10 +44,14 @@
          (reset! function (find-api-function ns 'function))
          (reset! transactional-entities
                  (@function '{:lang :clojure
-                              :params [database q tempid id-types fs entities key-queries]
-                              :code (let [entity-id (fn [id-type f entity key-query]
-                                                      (let [{query :query rules :rules} key-query
-                                                            existing-id (ffirst (q query database rules))
+                              :params [database q tempid id-types fs entities key-rules]
+                              :code (let [entity-id (fn [id-type f entity key-rule]
+                                                      (let [existing-id (ffirst
+                                                                         (q '[:find ?entity
+                                                                              :in $ %
+                                                                              :where (entity? ?entity)]
+                                                                            database
+                                                                            key-rule))
                                                             temp-id (tempid :db.part/user)]
                                                         (or (:db/id entity)
                                                             (case id-type
@@ -51,23 +59,46 @@
                                                               :save    (if-not existing-id temp-id)
                                                               :retract existing-id
                                                               :retract-entities existing-id))))]
-                                      (->> [id-types fs entities key-queries]
-                                           (apply (partial map (fn [id-type' f' entity' key-query']
-                                                                 (let [id (entity-id id-type' f' entity' key-query')]
+                                      (->> [id-types fs entities key-rules]
+                                           (apply (partial map (fn [id-type' f' entity' key-rule']
+                                                                 (let [id (entity-id id-type' f' entity' key-rule')]
                                                                    (if id (f' (assoc entity' :db/id id)))))))
                                            (filter identity)))}))))))
 
-(comment
 
-  (let [e1 {:book/title "Dune" :book/rating 9.4M}
-        e2 {:book/title "Dune"}]
-   (@transactional-entities (@db @conn)
-                            @q
-                            @tempid
-                            [:update :retract]
-                            [identity entomic.api/retract-entity-transaction-]
-                            [e1 e2]
-                            [(key-query [:book/title] e1) (key-query [:book/title] e2)]))
+
+(comment
+  (defn transactional-entities-
+    [database q tempid id-types fs entities key-rules]
+    (let [entity-id (fn [id-type f entity key-rule]
+                      (let [existing-id (ffirst
+                                         (q '[:find ?entity
+                                              :in $ %
+                                              :where (entity? ?entity)]
+                                            database
+                                            key-rule))
+                            temp-id (tempid :db.part/user)]
+                        (or (:db/id entity)
+                            (case id-type
+                              :update  (or existing-id temp-id)
+                              :save    (if-not existing-id temp-id)
+                              :retract existing-id
+                              :retract-entities existing-id))))]
+      (->> [id-types fs entities key-rules]
+           (apply (partial map (fn [id-type' f' entity' key-rule']
+                                 (let [id (entity-id id-type' f' entity' key-rule')]
+                                   (if id (f' (assoc entity' :db/id id)))))))
+           (filter identity))))
+
+  (a/update! [] )
+
+  (transactional-entities- (@db @conn)
+                          @q
+                          @tempid
+                          [:update]
+                          [identity]
+                          [{:book/title "Dune" :book/isbn "9999999999"}]
+                          [(key-rules {:book/title "Dune" :book/isbn "9999999999"} [:book/title])])
 
   )
 
@@ -131,19 +162,7 @@
          (map (partial apply (partial entity-where ?entity)))
          (reduce (fn [v w] (into v w)) [])))
 
-(defn- extract-sets
-  [entity]
-  (let [f (fn [[k v]] (set? v))
-        entity' (->> entity
-                     (filter (complement f))
-                     (into {}))
-        sets (->> entity
-                  (filter f)
-                  (map (fn [[k s]] (->> s (map (fn [v] [k v])))))
-                  )]
-    [entity' sets]))
-
-(defn- rules
+(defn- expand-rule
   [entity sets]
   (->> sets
        (reduce
@@ -159,28 +178,55 @@
        (map (fn [rule] (into '[[entity? ?entity]] rule)))
        vec))
 
-(defn- entity-query-and-rules
-  [entity sets]
-  {:query '[:find ?entity
+(defn prefix-rule-name
+  [k]
+  (-> k
+      name
+      (str "?")
+      symbol))
+
+(defn prefix-rule
+  [ident]
+  `[(~'entity? ~'?s)
+    ~['?s ident]])
+
+(declare entities)
+
+(defprotocol Rule
+  (rule [entity]))
+
+(extend-protocol Rule
+  clojure.lang.Keyword
+  (rule [prefix]
+    (->> (@q '[:find ?e
+             :where
+             [?e :db/ident]]
+           (@db @conn))
+       (entities (@db @conn))
+       (map :db/ident)
+       (filter #(= prefix (attribute-prefix %)))
+       (map prefix-rule)))
+  java.lang.Object
+  (rule [entity]
+    (let [f (fn [[k v]] (set? v))
+        entity' (->> entity
+                     (filter (complement f))
+                     (into {}))
+        sets (->> entity
+                  (filter f)
+                  (map (fn [[k s]] (->> s (map (fn [v] [k v])))))
+                  )]
+    (expand-rule entity sets))))
+
+(defn find-ids
+  ([database entity]
+      (@q '[:find ?entity
             :in $ %
             :where (entity? ?entity)]
-   :rules (rules entity sets)})
-
-(defn- find-ids
-  [database entity]
-  (let [[entity' sets] (extract-sets entity)
-        {query :query rules' :rules} (entity-query-and-rules entity' sets)]
-    (@q query
-        database
-        rules')))
-
-(defn- find-id
-  [database entity]
-  (let [ids' (find-ids database entity)]
-    (cond
-     (= 0 (count ids')) nil
-     (= 1 (count ids')) (first (first ids'))
-     :else (throw (Exception. (str "more than 1 entity id found for " entity))))))
+          database
+          (rule entity)))
+  ([entity]
+     (find-ids (@db @conn) entity)))
 
 (defn- decorate-entity
   [database entity']
@@ -194,29 +240,31 @@
                               v)]))
          (into {}))))
 
-(defn- entities
-  [database result-set]
-  (->> result-set
-       (map first)
-       (map (partial @entity database))
-       (map (partial decorate-entity database))))
+(defn entities
+  ([database result-set]
+     (->> result-set
+          (map first)
+          (map (partial @entity database))
+          (map (partial decorate-entity database))))
+  ([result-set]
+     (entities (@db @conn) result-set)))
 
-(defn- key-query
+(defn- key-rule
   [entity key]
   {:pre (every? identity (map entity key))}
   (let [entity' (if (seq key)
                   (select-keys entity key)
                   (dissoc entity :db/id))
         entity'' (if (seq entity') entity' entity)]
-    (apply entity-query-and-rules (extract-sets entity''))))
+    (rule entity'')))
 
 (defn transact!
   [id-types fs entities keys]
-  (let [queries (map key-query entities keys)]
+  (let [rules' (map key-rule entities keys)]
     (if (seq entities)
-      (@transact @conn [[:transactional-entities @q @tempid id-types fs entities queries]]))))
+      (@transact @conn [[:transactional-entities @q @tempid id-types fs entities rules']]))))
 
-(defn f-raw
+(defn find
   [partial-entity]
   (let [database (@db @conn)]
     (if-let [id (:db/id partial-entity)]
@@ -224,19 +272,3 @@
       (->> partial-entity
            (find-ids database)
            (entities database)))))
-
-(defn fu-raw [x]
-  "finds a single entity in datomic given a query (as an entity). Multiple results throws an exception."
-  (let [entities (f-raw x)]
-    (case (count entities)
-      1 (first entities)
-      0 nil
-      (throw (Exception. (str "more than one entity found for: " x))))))
-
-(defn ids
-  [entity]
-  (find-ids (@db @conn) entity))
-
-(defn id
-  [entity]
-  (find-id (@db @conn) entity))
