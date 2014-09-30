@@ -14,9 +14,15 @@
 
 (defonce custom-parsers (atom {}))
 
-(defn set-custom-parser!
-  [attributes function]
-  (swap! custom-parsers (partial reduce (fn [m a] (assoc m a function))) attributes))
+(defonce custom-unparsers (atom {}))
+
+(defn set-custom!
+  [a attributes function]
+  (swap! a (partial reduce (fn [m a] (assoc m a function))) attributes))
+
+(def set-custom-unparser! (partial set-custom! custom-unparsers))
+
+(def set-custom-parser! (partial set-custom! custom-parsers))
 
 (defn- attribute-types
   [entity]
@@ -100,16 +106,21 @@
   [d-type k v]
   ((parser d-type k v) v))
 
+(defn- custom-unparser
+  [k]
+  (get @custom-unparsers k))
+
 (defn- unparser
-  [d-type]
+  [d-type k]
   (if d-type
-    (or (d-type unparse-map)
+    (or (custom-unparser k)
+     (d-type unparse-map)
         identity)
     identity))
 
 (defn- unparse-value
   [d-type k v]
-  ((unparser d-type) v))
+  ((unparser d-type k) v))
 
 (defn- modify-entity-values
   [f entity]

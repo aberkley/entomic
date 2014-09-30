@@ -35,6 +35,8 @@
 
 (f/set-custom-parser! [:collection/user] user-of)
 
+(f/set-custom-unparser! [:collection/user] :user/name)
+
 (d/transact conn'
  [{:db/id (d/tempid :db.part/db)
    :db/ident :book/title
@@ -125,7 +127,7 @@
                                    {:book/title #{"Dune" "Excession"}
                                     :book/rating '(> 4M)
                                     :book/author #{"Frank Herbert" "Tom Smith"}}))))
-  (is (boolean (a/id {:book/isbn "9876543210"})))
+  (is (= java.lang.Long (type (a/id {:book/isbn "9876543210"}))))
   (is (boolean (seq (a/ids {:book/isbn "9876543210"}))))
   (is (a/f? {:book/isbn "9876543210"}))
   (is (a/fu? {:book/isbn "9876543210"}))
@@ -204,4 +206,5 @@
   (is (boolean
        (a/transaction!
         (:retract-entities [{:book/title "Neuromancer" :book/author "William Gibson" :book/isbn "1122334455"}]))))
-  (is (boolean (a/fu {:user/dob (t/date-time 1981 10 14)}))))
+  (is (boolean (a/fu {:user/dob (t/date-time 1981 10 14)})))
+  (is (= "Alex" (:collection/user (a/fu {:collection/user "Alex"})))))

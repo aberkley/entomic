@@ -12,6 +12,7 @@
   [x]
   (->> x
        ids
+       (map first)
        (ft/verify-unique x)))
 
 (defn f?
