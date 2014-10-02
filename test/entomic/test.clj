@@ -9,7 +9,9 @@
 
 (e/resolve-api! (find-ns 'datomic.api))
 
-(defonce uri "datomic:mem://test")
+(def uri "datomic:mem://test")
+
+;;(def uri "datomic:free://localhost:4334/test")
 
 (d/delete-database uri)
 
@@ -203,8 +205,5 @@
   (is (boolean (a/fu {:book/title "Neuromancer"})))
   (is (= 9.5M (:book/rating (a/fu {:book/title "Neuromancer"}))))
   (is (nil? (:book/isbn (a/fu {:book/title "Neuromancer"}))))
-  (is (boolean
-       (a/transaction!
-        (:retract-entities [{:book/title "Neuromancer" :book/author "William Gibson" :book/isbn "1122334455"}]))))
   (is (boolean (a/fu {:user/dob (t/date-time 1981 10 14)})))
   (is (= "Alex" (:collection/user (a/fu {:collection/user "Alex" :collection/book {:book/title "The Player Of Games"}})))))

@@ -2,11 +2,6 @@
   (:use clojure.pprint
         entomic.coerce))
 
-;; TODO: 3 - include attribute manipulating functions
-
-(def rule-query
-  )
-
 (defonce q (atom nil))
 
 (defonce db (atom nil))
@@ -31,6 +26,34 @@
        first
        second))
 
+(def transactional-entities-code
+  '{:lang :clojure
+    :params [database id-types entities rules attributes]
+    :code (let [find-id (fn [entity rule id-type]
+                          (let [existing-id (ffirst
+                                             (d/q '[:find ?entity
+                                                    :in $ %
+                                                    :where (entity? ?entity)]
+                                                  database
+                                                  rule))
+                                temp-id (d/tempid :db.part/user)]
+                            (or (:db/id entity)
+                                (case id-type
+                                  :update  (or existing-id temp-id)
+                                  :save    (if-not existing-id temp-id)
+                                  :retract existing-id
+                                  :retract-entities existing-id))))
+                ids (map find-id entities rules id-types)
+                entities' (map (fn [entity id] (if id (assoc entity :db/id id))) entities ids)
+                f (fn [id-type entity attribute]
+                    (if entity
+                      (case id-type
+                        :retract-entities [:db.fn/retractEntity (:db/id entity)]
+                        :retract [:db/retract (:db/id entity) attribute (attribute entity)]
+                        entity)))
+                ts (map f id-types entities' attributes)]
+            (filter identity ts))})
+
 (defn resolve-api!
   ([ns]
      (if ns
@@ -43,64 +66,7 @@
          (reset! tempid (find-api-function ns 'tempid))
          (reset! function (find-api-function ns 'function))
          (reset! transactional-entities
-                 (@function '{:lang :clojure
-                              :params [database q tempid id-types fs entities key-rules]
-                              :code (let [entity-id (fn [id-type f entity key-rule]
-                                                      (let [existing-id (ffirst
-                                                                         (q '[:find ?entity
-                                                                              :in $ %
-                                                                              :where (entity? ?entity)]
-                                                                            database
-                                                                            key-rule))
-                                                            temp-id (tempid :db.part/user)]
-                                                        (or (:db/id entity)
-                                                            (case id-type
-                                                              :update  (or existing-id temp-id)
-                                                              :save    (if-not existing-id temp-id)
-                                                              :retract existing-id
-                                                              :retract-entities existing-id))))]
-                                      (->> [id-types fs entities key-rules]
-                                           (apply (partial map (fn [id-type' f' entity' key-rule']
-                                                                 (let [id (entity-id id-type' f' entity' key-rule')]
-                                                                   (if id (f' (assoc entity' :db/id id)))))))
-                                           (filter identity)))}))))))
-
-
-
-(comment
-  (defn transactional-entities-
-    [database q tempid id-types fs entities key-rules]
-    (let [entity-id (fn [id-type f entity key-rule]
-                      (let [existing-id (ffirst
-                                         (q '[:find ?entity
-                                              :in $ %
-                                              :where (entity? ?entity)]
-                                            database
-                                            key-rule))
-                            temp-id (tempid :db.part/user)]
-                        (or (:db/id entity)
-                            (case id-type
-                              :update  (or existing-id temp-id)
-                              :save    (if-not existing-id temp-id)
-                              :retract existing-id
-                              :retract-entities existing-id))))]
-      (->> [id-types fs entities key-rules]
-           (apply (partial map (fn [id-type' f' entity' key-rule']
-                                 (let [id (entity-id id-type' f' entity' key-rule')]
-                                   (if id (f' (assoc entity' :db/id id)))))))
-           (filter identity))))
-
-  (a/update! [] )
-
-  (transactional-entities- (@db @conn)
-                          @q
-                          @tempid
-                          [:update]
-                          [identity]
-                          [{:book/title "Dune" :book/isbn "9999999999"}]
-                          [(key-rules {:book/title "Dune" :book/isbn "9999999999"} [:book/title])])
-
-  )
+                 (@function transactional-entities-code))))))
 
 (defn set-connection!
   [conn']
@@ -259,10 +225,10 @@
     (rule entity'')))
 
 (defn transact!
-  [id-types fs entities keys]
+  [id-types entities keys attributes]
   (let [rules' (map key-rule entities keys)]
     (if (seq entities)
-      (@transact @conn [[:transactional-entities @q @tempid id-types fs entities rules']]))))
+      (@transact @conn [[:transactional-entities id-types entities rules' attributes]]))))
 
 (defn find
   [partial-entity]

@@ -42,27 +42,15 @@
        f
        (ft/verify-unique x)))
 
-(defn- retract-transaction
-  [attribute entity]
-  [:db/retract (:db/id entity) attribute (attribute entity)])
-
-(defn- retract-entity-transaction
-  [entity]
-  [:db.fn/retractEntity (:db/id entity)])
-
 (defn- commits!
-  [id-types fs entities keys]
-  (e/transact! id-types fs (ft/parse entities) keys))
+  [id-types entities keys attributes]
+  (e/transact! id-types (ft/parse entities) keys attributes))
 
 (defn- expand-and-merge-args
   [cum [id-type entities key attribute]]
-  (let [key' (or key [])
-        f (case id-type
-            :retract-entities retract-entity-transaction
-            :retract (partial retract-transaction attribute)
-            identity)]
+  (let [key' (or key [])]
     (->> entities
-         (map (fn [entity] [id-type f entity key']))
+         (map (fn [entity] [id-type entity key' attribute]))
          (into cum))))
 
 (defn as-transaction!
@@ -70,10 +58,6 @@
   (apply commits!
    (apply map vector
           (reduce expand-and-merge-args [] args))))
-
-(defmacro transaction!
-  [& args]
-  `(apply ~as-transaction! '~args))
 
 (defn save!
   ([entities key]
