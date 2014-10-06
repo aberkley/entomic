@@ -18,6 +18,8 @@
 
 (defonce transactional-entities (atom nil))
 
+(defonce connect (atom nil))
+
 (defn find-api-function
   [ns symbol']
   (->> ns
@@ -65,6 +67,7 @@
          (reset! conn (find-api-function ns 'conn))
          (reset! tempid (find-api-function ns 'tempid))
          (reset! function (find-api-function ns 'function))
+         (reset! connect (find-api-function ns 'connect))
          (reset! transactional-entities
                  (@function transactional-entities-code))))))
 

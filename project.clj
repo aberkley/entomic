@@ -5,6 +5,7 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [com.datomic/datomic-free "0.9.4880.2" :scope "test"]
+                 [org.clojars.aberkley/utilities "0.1.3-SNAPSHOT"]
                  [clj-time "0.6.0"]]
   :offline? false
   :jvm-opts ["-Xmx768M"])
