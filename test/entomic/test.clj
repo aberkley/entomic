@@ -13,13 +13,11 @@
 
 ;;(def uri "datomic:free://localhost:4334/test")
 
-(d/delete-database uri)
+(e/delete-database uri)
 
-(d/create-database uri)
+(e/create-database uri)
 
-(def conn' (d/connect uri))
-
-(e/set-connection! conn')
+(e/set-connection! uri)
 
 (defprotocol User
   (user-of [this]))
@@ -39,7 +37,7 @@
 
 (f/set-custom-unparser! [:collection/user] :user/name)
 
-(d/transact conn'
+(e/transact e/conn
  [{:db/id (d/tempid :db.part/db)
    :db/ident :book/title
    :db/valueType :db.type/string
@@ -92,7 +90,7 @@
    :db/cardinality :db.cardinality/one
    :db.install/_attribute :db.part/db}])
 
-(d/transact conn'
+(e/transact e/conn
             [{:db/id (d/tempid :db.part/user -1)
               :book/title "Dune"
               :book/author "Frank Herbert"

@@ -29,7 +29,7 @@
       second
       keyword))
 
-(defn attribute
+(defn attribute-of
   [prefix suffix]
   (keyword (str (name prefix) "/" (name suffix))))
 
@@ -38,7 +38,7 @@
   (let [old-prefix (attribute-prefix k)
         suffix (attribute-suffix k)]
     (if suffix
-      (attribute new-prefix suffix)
+      (attribute-of new-prefix suffix)
       k)))
 
 (defn update-attribute-prefixes

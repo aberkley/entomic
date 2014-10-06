@@ -1,24 +1,27 @@
 (ns entomic.core
   (:use clojure.pprint
-        entomic.coerce))
+        entomic.coerce
+        utilities.ns))
 
-(defonce q (atom nil))
+(declare q)
 
-(defonce db (atom nil))
+(declare db)
 
-(defonce entity (atom nil))
+(declare entity)
 
-(defonce transact (atom nil))
+(declare transact)
 
-(defonce conn (atom nil))
+(declare conn)
 
-(defonce tempid (atom nil))
+(declare tempid)
 
-(defonce function (atom nil))
+(declare function)
 
-(defonce transactional-entities (atom nil))
+(declare transactional-entities)
 
-(defonce connect (atom nil))
+(declare connect)
+
+(declare uri)
 
 (defn find-api-function
   [ns symbol']
@@ -57,28 +60,16 @@
             (filter identity ts))})
 
 (defn resolve-api!
-  ([ns]
-     (if ns
-       (do
-         (reset! q (find-api-function ns 'q))
-         (reset! db (find-api-function ns 'db))
-         (reset! entity (find-api-function ns 'entity))
-         (reset! transact (find-api-function ns 'transact))
-         (reset! conn (find-api-function ns 'conn))
-         (reset! tempid (find-api-function ns 'tempid))
-         (reset! function (find-api-function ns 'function))
-         (reset! connect (find-api-function ns 'connect))
-         (reset! transactional-entities
-                 (@function transactional-entities-code))))))
+  [ns]
+  (intern-ns (find-ns 'datomic.api) (find-ns 'entomic.core)))
 
 (defn set-connection!
-  [conn']
-  (let [ident :transactional-entities]
-    (do
-      (reset! conn conn')
-      (@transact @conn [{:db/id (@tempid :db.part/user)
-                         :db/ident :transactional-entities
-                         :db/fn @transactional-entities}]))))
+  [my-uri]
+  (def uri my-uri)
+  (def conn (connect uri))
+  (transact conn [{:db/id (tempid :db.part/user)
+                   :db/ident :transactional-entities
+                   :db/fn (function transactional-entities-code)}]))
 
 (defn- find-attribute
   [form]
@@ -167,11 +158,11 @@
 (extend-protocol Rule
   clojure.lang.Keyword
   (rule [prefix]
-    (->> (@q '[:find ?e
+    (->> (q '[:find ?e
              :where
              [?e :db/ident]]
-           (@db @conn))
-       (entities (@db @conn))
+           (db conn))
+       (entities (db conn))
        (map :db/ident)
        (filter #(= prefix (attribute-prefix %)))
        (map prefix-rule)))
@@ -189,13 +180,13 @@
 
 (defn find-ids
   ([database entity]
-      (@q '[:find ?entity
+      (q '[:find ?entity
             :in $ %
             :where (entity? ?entity)]
           database
           (rule entity)))
   ([entity]
-     (find-ids (@db @conn) entity)))
+     (find-ids (db conn) entity)))
 
 (defn- decorate-entity
   [database entity']
@@ -204,7 +195,7 @@
     (->> explicit-map
          (into [])
          (map (fn [[k v]] [k (if (:db/id v)
-                              (->> (@entity database (:db/id v))
+                              (->> (entity database (:db/id v))
                                    (decorate-entity database))
                               v)]))
          (into {}))))
@@ -213,10 +204,10 @@
   ([database result-set]
      (->> result-set
           (map first)
-          (map (partial @entity database))
+          (map (partial entity database))
           (map (partial decorate-entity database))))
   ([result-set]
-     (entities (@db @conn) result-set)))
+     (entities (db conn) result-set)))
 
 (defn- key-rule
   [entity key]
@@ -231,13 +222,13 @@
   [id-types entities keys attributes]
   (let [rules' (map key-rule entities keys)]
     (if (seq entities)
-      (@transact @conn [[:transactional-entities id-types entities rules' attributes]]))))
+      (transact conn [[:transactional-entities id-types entities rules' attributes]]))))
 
 (defn find
   [partial-entity]
-  (let [database (@db @conn)]
+  (let [database (db conn)]
     (if-let [id (:db/id partial-entity)]
-      (entities (@db @conn) [[id]])
+      (entities (db conn) [[id]])
       (->> partial-entity
            (find-ids database)
            (entities database)))))
