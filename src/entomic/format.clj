@@ -113,9 +113,11 @@
 (defn- unparser
   [d-type k]
   (if d-type
-    (or (custom-unparser k)
-     (d-type unparse-map)
-        identity)
+    (comp
+     (or (custom-unparser k)
+         identity)
+     (or (d-type unparse-map)
+         identity))
     identity))
 
 (defn- unparse-value

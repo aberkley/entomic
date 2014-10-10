@@ -3,6 +3,7 @@
             [datomic.api :only [q db] :as d]
             [clj-time.core :as t]
             [clj-time.coerce :as c]
+            [clj-time.format :as fmt]
             [entomic.core :as e]
             [entomic.format :as f]
             [entomic.api :as a]))
@@ -183,6 +184,10 @@
          (type
           (:book/publishing-date
            (f/unparse-entity {:book/publishing-date (c/to-date (t/date-time 2014 1 1))})))))
+  (is (f/set-custom-unparser! [:book/publishing-date] (partial fmt/unparse (fmt/formatters :date))))
+  (is (string?
+       (:book/publishing-date
+        (f/unparse-entity {:book/publishing-date (c/to-date (t/date-time 2014 1 1))}))))
   (is (nil? (f/unparse-entity nil)))
   (is (= java.lang.Long
          (type
