@@ -56,7 +56,8 @@
 (defn all-types? [x] true)
 
 (defprotocol Ref
-  (parse-ref [x]))
+  (parse-ref [x])
+  (resolve-ref [x]))
 
 (extend-protocol Ref
   java.lang.Long
@@ -65,6 +66,9 @@
   clojure.lang.Keyword
   (parse-ref [x]
     {:db/ident x})
+  (resolve-ref [x]
+    (resolve-ref
+     (parse-ref x)))
   java.lang.Object
   (parse-ref [x]
     (->> x
@@ -85,8 +89,7 @@
 
 (defn custom-parser
   [k]
-  (if-let [p (get @custom-parsers k)]
-    (comp :db/id p)))
+  (get @custom-parsers k))
 
 (defn default-parser
   [d-type k v]
@@ -105,6 +108,38 @@
 (defn- parse-value
   [d-type k v]
   ((parser d-type k v) v))
+
+(defn- ref-resolver
+  [d-type]
+  (if (= d-type :db.type/ref)
+    parse-ref
+    identity))
+
+(defn- resolver
+  [d-type k v]
+  (comp
+   (ref-resolver d-type)
+   (or (parser d-type k v)
+       identity)))
+
+(defn resolve-value
+  [d-type k v]
+  ((resolver d-type k v) v))
+
+(comment
+  (resolve-value :db.type/ref :collection/book {:book/title "Matter"})
+
+  (resolve-value :db.type/ref :collection/user "Alex")
+  (resolve-value :db.type/ref :collection/user {:user/name "Alex"})
+
+  (resolve-entity {:collection/user "Alex"
+                   })
+  (parse-ref {:user/name "Alex"})
+  (resolve-value :db.type/ref :collection/book {:book/title "The Player Of Games"})
+  (resolve-entity {:collection/user "Alex"
+                   :collection/book {:book/title "The Player Of Games"}})
+
+  )
 
 (defn- custom-unparser
   [k]
@@ -139,6 +174,8 @@
 
 (def unparse-entity (partial modify-entity-values unparse-value))
 
+(def resolve-entity (partial modify-entity-values resolve-value))
+
 (defn parse
   [entities]
   (map parse-entity entities))
@@ -146,3 +183,7 @@
 (defn unparse
   [entities]
   (map unparse-entity entities))
+
+(defn resolve
+  [entities]
+  (map resolve-entity entities))

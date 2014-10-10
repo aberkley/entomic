@@ -44,7 +44,7 @@
 
 (defn- commits!
   [id-types entities keys attributes]
-  (e/transact! id-types (ft/parse entities) keys attributes))
+  (e/transact! id-types (ft/resolve entities) keys attributes))
 
 (defn- expand-and-merge-args
   [cum [id-type entities key attribute]]

@@ -24,15 +24,13 @@
   (user-of [this]))
 
 (extend-protocol User
-  java.lang.Number
-  (user-of [p-id]
-    (a/fu {:db/id p-id}))
   java.lang.String
   (user-of [p-name]
-    (a/fu {:user/name p-name}))
+    (:db/id
+     (a/fu {:user/name p-name})))
   java.lang.Object
   (user-of [this]
-    (a/fu this)))
+    this))
 
 (f/set-custom-parser! [:collection/user] user-of)
 
@@ -106,13 +104,19 @@
                                      (t/date-time 2003 5 28))
               :book/isbn "9876543210"
               :book/rating 8.2M}
+             {:db/id (d/tempid :db.part/user -6)
+              :book/title "Matter"
+              :book/author "Iain M. Banks"}
              {:db/id (d/tempid :db.part/user -3)
               :user/name "Alex"
               :user/dob (c/to-date
                          (t/date-time 1981 10 14))}
              {:db/id (d/tempid :db.part/user -4)
               :collection/user (d/tempid :db.part/user -3)
-              :collection/book (d/tempid :db.part/user -2)}])
+              :collection/book (d/tempid :db.part/user -2)}
+             {:db/id (d/tempid :db.part/user -5)
+              :collection/user (d/tempid :db.part/user -3)
+              :collection/book (d/tempid :db.part/user -6)}])
 
 (deftest test-query
   (is (= "Excession" (:book/title (a/fu {:book/isbn "9876543210"}))))
@@ -122,8 +126,10 @@
   (is (= nil         (:book/title (a/fu {:book/rating '[(> 6M) (< 7M)]}))))
   (is (= "Excession" (:book/title (a/fu {'(bigdec :book/isbn) 9876543210M}))))
   (is (= "Excession" (:book/title (a/fu {'(bigdec :book/isbn) '(> 1234567890)}))))
-  (is (= "Excession" (:book/title (:collection/book
-                                   (a/fu {:collection/user {:user/name "Alex"}})))))
+  (is (= "Excession" (:book/title
+                      (:collection/book
+                       (a/fu {:collection/user {:user/name "Alex"}
+                              :collection/book {:book/title "Excession"}})))))
   (is (= "Dune"      (:book/title (a/fu
                                    {:book/title #{"Dune" "Excession"}
                                     :book/rating '(> 4M)
@@ -132,7 +138,7 @@
   (is (boolean (seq (a/ids {:book/isbn "9876543210"}))))
   (is (a/f? {:book/isbn "9876543210"}))
   (is (a/fu? {:book/isbn "9876543210"}))
-  (is (= 2 (count (a/f :book))))
+  (is (= 3 (count (a/f :book))))
   (is (boolean (a/update! [{:book/title "Dune" :book/isbn "9999999999"}] [:book/title])))
   (is (= 1 (count (a/ids {:book/title "Dune"}))))
   (is (a/fu? {:book/isbn "9999999999"}))
@@ -161,9 +167,13 @@
   (is (= java.lang.Long
          (type
           (:collection/user
-           (f/parse-entity
+           (f/resolve-entity
             {:collection/user {:user/name "Alex"}
-             :collection/book {:book/title "Excession"}})))))
+             :collection/book {:book/title "Matter"}})))))
+  (comment
+    (a/f {:collection/user {:user/name "Alex"}})
+    (a/fu {:book/title "Matter"})
+    )
   (is (= java.math.BigDecimal
          (type
           (:book/rating
@@ -184,7 +194,7 @@
          (type
           (:book/publishing-date
            (f/unparse-entity {:book/publishing-date (c/to-date (t/date-time 2014 1 1))})))))
-  (is (f/set-custom-unparser! [:book/publishing-date] (partial fmt/unparse (fmt/formatters :date))))
+  (is (boolean (f/set-custom-unparser! [:book/publishing-date] (partial fmt/unparse (fmt/formatters :date)))))
   (is (string?
        (:book/publishing-date
         (f/unparse-entity {:book/publishing-date (c/to-date (t/date-time 2014 1 1))}))))
@@ -197,7 +207,7 @@
                           :book/author "Iain M. Banks"}])))
   (is (boolean (a/save! [{:collection/user "Alex"
                           :collection/book {:book/title "The Player Of Games"}}])))
-  (is (= 2 (count (a/f {:collection/user "Alex"}))))
+  (is (= 3 (count (a/f {:collection/user "Alex"}))))
   (is (boolean (a/save! [{:user/name "Book Club" :user/type :user.type/charity}])))
   (is (boolean (a/fu {:user/type :user.type/charity})))
   (is (boolean (a/save! [{:book/title "Neuromancer" :book/author "William Gibson" :book/isbn "1122334455"}])))
