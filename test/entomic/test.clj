@@ -170,10 +170,6 @@
            (f/resolve-entity
             {:collection/user {:user/name "Alex"}
              :collection/book {:book/title "Matter"}})))))
-  (comment
-    (a/f {:collection/user {:user/name "Alex"}})
-    (a/fu {:book/title "Matter"})
-    )
   (is (= java.math.BigDecimal
          (type
           (:book/rating
@@ -214,7 +210,8 @@
   (is (boolean
        (a/as-transaction!
         [:update [{:book/title "Neuromancer" :book/rating "9.5"}] [:book/title]]
-        [:retract [{:book/title "Neuromancer" :book/isbn "1122334455"}] [:book/title] :book/isbn])))
+        [:retract [{:book/title "Neuromancer" :book/isbn "1122334455"}] [:book/title] :book/isbn]
+        [:save [{:book/title "The Algebraist" :book/author "Iain M. Banks"}]])))
   (is (boolean (a/fu {:book/title "Neuromancer"})))
   (is (= 9.5M (:book/rating (a/fu {:book/title "Neuromancer"}))))
   (is (nil? (:book/isbn (a/fu {:book/title "Neuromancer"}))))
