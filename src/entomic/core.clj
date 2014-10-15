@@ -94,6 +94,7 @@
 (defn- where-values
   [? form]
   (cond
+
    (vector? form) (vec
                    (map (partial where-value ?) form))
    (set? form) nil ;; or using rules
@@ -103,17 +104,24 @@
 
 (defn- entity-where
   [?entity k v]
-  (let [k? (self-eval? k)
-        a (find-attribute k)
-        ? (symbol (str '? (name a)))
-        ?' (symbol (str '? (name a) "'"))
-        where-key (if (not k?)
-                    [(clojure.walk/prewalk-replace {a ?} k) ?'])
-        val-sym (if k? ? ?')
-        where-val  (where-values val-sym v)]
-    (->> [?entity a ?]
-         (merge where-val where-key)
-         (filter identity))))
+  (if (= v '?)
+    [[?entity k]]
+    (let [k? (self-eval? k)
+          a (find-attribute k)
+          ? (symbol (str '? (name a)))
+          ?' (symbol (str '? (name a) "'"))
+          where-key (if (not k?)
+                      [(clojure.walk/prewalk-replace {a ?} k) ?'])
+          val-sym (if k? ? ?')
+          where-val  (where-values val-sym v)]
+      (->> [?entity a ?]
+           (merge where-val where-key)
+           (filter identity)))))
+
+(comment
+  (entity-where '?entity :book/title "Dune")
+  (entity-where '?entity :book/title '?)
+  )
 
 (defn- entity-wheres
   [?entity entity]

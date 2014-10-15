@@ -8,17 +8,9 @@
             [entomic.format :as f]
             [entomic.api :as a]))
 
-(e/resolve-api! (find-ns 'datomic.api))
-
 (def uri "datomic:mem://test")
 
 ;;(def uri "datomic:free://localhost:4334/test")
-
-(e/delete-database uri)
-
-(e/create-database uri)
-
-(e/set-connection! uri)
 
 (defprotocol User
   (user-of [this]))
@@ -32,93 +24,100 @@
   (user-of [this]
     this))
 
-(f/set-custom-parser! [:collection/user] user-of)
+(def schema-tx
+  [{:db/id (d/tempid :db.part/db)
+    :db/ident :book/title
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   {:db/id (d/tempid :db.part/db)
+    :db/ident :book/author
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   {:db/id (d/tempid :db.part/db)
+    :db/ident :book/publishing-date
+    :db/valueType :db.type/instant
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   {:db/id (d/tempid :db.part/db)
+    :db/ident :book/isbn
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   {:db/id (d/tempid :db.part/db)
+    :db/ident :book/rating
+    :db/valueType :db.type/bigdec
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   {:db/id (d/tempid :db.part/db)
+    :db/ident :user/name
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   {:db/id (d/tempid :db.part/db)
+    :db/ident :user/dob
+    :db/valueType :db.type/instant
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   {:db/id (d/tempid :db.part/db)
+    :db/ident :user/type
+    :db/valueType :db.type/ref
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   [:db/add #db/id[:db.part/user] :db/ident :user.type/charity]
+   {:db/id (d/tempid :db.part/db)
+    :db/ident :collection/user
+    :db/valueType :db.type/ref
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   {:db/id (d/tempid :db.part/db)
+    :db/ident :collection/book
+    :db/valueType :db.type/ref
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}])
 
-(f/set-custom-unparser! [:collection/user] :user/name)
+(def data-tx
+  [{:db/id (d/tempid :db.part/user -1)
+    :book/title "Dune"
+    :book/author "Frank Herbert"
+    :book/publishing-date (c/to-date
+                           (t/date-time 1971 6 12))
+    :book/isbn "1234567890"
+    :book/rating 9.5M}
+   {:db/id (d/tempid :db.part/user -2)
+    :book/title "Excession"
+    :book/author "Iain M. Banks"
+    :book/publishing-date (c/to-date
+                           (t/date-time 2003 5 28))
+    :book/isbn "9876543210"
+    :book/rating 8.2M}
+   {:db/id (d/tempid :db.part/user -6)
+    :book/title "Matter"
+    :book/author "Iain M. Banks"}
+   {:db/id (d/tempid :db.part/user -3)
+    :user/name "Alex"
+    :user/dob (c/to-date
+               (t/date-time 1981 10 14))}
+   {:db/id (d/tempid :db.part/user -4)
+    :collection/user (d/tempid :db.part/user -3)
+    :collection/book (d/tempid :db.part/user -2)}
+   {:db/id (d/tempid :db.part/user -5)
+    :collection/user (d/tempid :db.part/user -3)
+    :collection/book (d/tempid :db.part/user -6)}])
 
-(e/transact e/conn
- [{:db/id (d/tempid :db.part/db)
-   :db/ident :book/title
-   :db/valueType :db.type/string
-   :db/cardinality :db.cardinality/one
-   :db.install/_attribute :db.part/db}
-  {:db/id (d/tempid :db.part/db)
-   :db/ident :book/author
-   :db/valueType :db.type/string
-   :db/cardinality :db.cardinality/one
-   :db.install/_attribute :db.part/db}
-  {:db/id (d/tempid :db.part/db)
-   :db/ident :book/publishing-date
-   :db/valueType :db.type/instant
-   :db/cardinality :db.cardinality/one
-   :db.install/_attribute :db.part/db}
-  {:db/id (d/tempid :db.part/db)
-   :db/ident :book/isbn
-   :db/valueType :db.type/string
-   :db/cardinality :db.cardinality/one
-   :db.install/_attribute :db.part/db}
-  {:db/id (d/tempid :db.part/db)
-   :db/ident :book/rating
-   :db/valueType :db.type/bigdec
-   :db/cardinality :db.cardinality/one
-   :db.install/_attribute :db.part/db}
-  {:db/id (d/tempid :db.part/db)
-   :db/ident :user/name
-   :db/valueType :db.type/string
-   :db/cardinality :db.cardinality/one
-   :db.install/_attribute :db.part/db}
-  {:db/id (d/tempid :db.part/db)
-   :db/ident :user/dob
-   :db/valueType :db.type/instant
-   :db/cardinality :db.cardinality/one
-   :db.install/_attribute :db.part/db}
-  {:db/id (d/tempid :db.part/db)
-   :db/ident :user/type
-   :db/valueType :db.type/ref
-   :db/cardinality :db.cardinality/one
-   :db.install/_attribute :db.part/db}
-  [:db/add #db/id[:db.part/user] :db/ident :user.type/charity]
-  {:db/id (d/tempid :db.part/db)
-   :db/ident :collection/user
-   :db/valueType :db.type/ref
-   :db/cardinality :db.cardinality/one
-   :db.install/_attribute :db.part/db}
-  {:db/id (d/tempid :db.part/db)
-   :db/ident :collection/book
-   :db/valueType :db.type/ref
-   :db/cardinality :db.cardinality/one
-   :db.install/_attribute :db.part/db}])
-
-(e/transact e/conn
-            [{:db/id (d/tempid :db.part/user -1)
-              :book/title "Dune"
-              :book/author "Frank Herbert"
-              :book/publishing-date (c/to-date
-                                     (t/date-time 1971 6 12))
-              :book/isbn "1234567890"
-              :book/rating 9.5M}
-             {:db/id (d/tempid :db.part/user -2)
-              :book/title "Excession"
-              :book/author "Iain M. Banks"
-              :book/publishing-date (c/to-date
-                                     (t/date-time 2003 5 28))
-              :book/isbn "9876543210"
-              :book/rating 8.2M}
-             {:db/id (d/tempid :db.part/user -6)
-              :book/title "Matter"
-              :book/author "Iain M. Banks"}
-             {:db/id (d/tempid :db.part/user -3)
-              :user/name "Alex"
-              :user/dob (c/to-date
-                         (t/date-time 1981 10 14))}
-             {:db/id (d/tempid :db.part/user -4)
-              :collection/user (d/tempid :db.part/user -3)
-              :collection/book (d/tempid :db.part/user -2)}
-             {:db/id (d/tempid :db.part/user -5)
-              :collection/user (d/tempid :db.part/user -3)
-              :collection/book (d/tempid :db.part/user -6)}])
+(defn init-db! []
+  (e/resolve-api! (find-ns 'datomic.api))
+  (d/delete-database uri)
+  (d/create-database uri)
+  (e/set-connection! uri)
+  (f/set-custom-parser! [:collection/user] user-of)
+  (f/set-custom-unparser! [:collection/user] :user/name)
+  (e/transact e/conn schema-tx)
+  (e/transact e/conn data-tx))
 
 (deftest test-query
+  (is (boolean (init-db!)))
   (is (= "Excession" (:book/title (a/fu {:book/isbn "9876543210"}))))
   (is (= nil         (:book/title (a/fu {:book/isbn "987654321"}))))
   (is (= "Dune"      (:book/title (a/fu {:book/rating '(> 9M)}))))
@@ -214,6 +213,7 @@
         [:save [{:book/title "The Algebraist" :book/author "Iain M. Banks"}]])))
   (is (boolean (a/fu {:book/title "Neuromancer"})))
   (is (= 9.5M (:book/rating (a/fu {:book/title "Neuromancer"}))))
+  (is (boolean (seq (a/f {:book/title '?}))))
   (is (nil? (:book/isbn (a/fu {:book/title "Neuromancer"}))))
   (is (boolean (a/fu {:user/dob (t/date-time 1981 10 14)})))
   (is (= "Alex" (:collection/user (a/fu {:collection/user "Alex" :collection/book {:book/title "The Player Of Games"}})))))
