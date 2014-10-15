@@ -60,8 +60,8 @@
             (filter identity ts))})
 
 (defn resolve-api!
-  [ns]
-  (intern-ns (find-ns 'datomic.api) (find-ns 'entomic.core)))
+  [ns-]
+  (intern-ns ns- (find-ns 'entomic.core)))
 
 (defn set-connection!
   [my-uri]
