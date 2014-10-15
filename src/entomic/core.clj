@@ -232,7 +232,7 @@
     (if (seq entities)
       (transact conn [[:transactional-entities id-types entities rules' attributes]]))))
 
-(defn find
+(defn find-
   [partial-entity]
   (let [database (db conn)]
     (if-let [id (:db/id partial-entity)]

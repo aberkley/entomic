@@ -1,6 +1,6 @@
 (ns entomic.format
   (:use clojure.pprint)
-  (:require [entomic.core :as e]
+  (:require [entomic.core :only [find-] :as e]
             [clj-time.coerce :as c]))
 
 ;; TODO: 1 - parse and unparse entities based on type of attribute. Ref types are resolved in the db if not an id
@@ -33,7 +33,7 @@
     (if (seq keyset)
       (->> keyset
            (assoc {} :db/ident)
-           e/find
+           e/find-
            (map (juxt :db/ident :db/valueType))
            (into {}))
       {})))
@@ -72,7 +72,7 @@
   java.lang.Object
   (parse-ref [x]
     (->> x
-         e/find
+         e/find-
          (verify-unique x)
          :db/id)))
 
@@ -126,21 +126,6 @@
   [d-type k v]
   ((resolver d-type k v) v))
 
-(comment
-  (resolve-value :db.type/ref :collection/book {:book/title "Matter"})
-
-  (resolve-value :db.type/ref :collection/user "Alex")
-  (resolve-value :db.type/ref :collection/user {:user/name "Alex"})
-
-  (resolve-entity {:collection/user "Alex"
-                   })
-  (parse-ref {:user/name "Alex"})
-  (resolve-value :db.type/ref :collection/book {:book/title "The Player Of Games"})
-  (resolve-entity {:collection/user "Alex"
-                   :collection/book {:book/title "The Player Of Games"}})
-
-  )
-
 (defn- custom-unparser
   [k]
   (get @custom-unparsers k))
@@ -184,6 +169,6 @@
   [entities]
   (map unparse-entity entities))
 
-(defn resolve
+(defn resolve-
   [entities]
   (map resolve-entity entities))

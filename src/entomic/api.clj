@@ -1,5 +1,5 @@
 (ns entomic.api
-  (:require [entomic.core :only [transact! find find-ids] :as e]
+  (:require [entomic.core :only [transact! find- find-ids] :as e]
             [entomic.format :only [parse unparse unparse-entity verify-unique] :as ft]))
 
 (defn ids
@@ -33,7 +33,7 @@
   [x]
   (->> x
        ft/parse-entity
-       e/find
+       e/find-
        ft/unparse))
 
 (defn fu
@@ -44,7 +44,7 @@
 
 (defn- commits!
   [id-types entities keys attributes]
-  (e/transact! id-types (ft/resolve entities) keys attributes))
+  (e/transact! id-types (ft/resolve- entities) keys attributes))
 
 (defn- expand-and-merge-args
   [cum [id-type entities key attribute]]
