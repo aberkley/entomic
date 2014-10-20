@@ -106,11 +106,17 @@
     :collection/user (d/tempid :db.part/user -3)
     :collection/book (d/tempid :db.part/user -6)}])
 
+(defn example-plugin [? form]
+    (let [s (seq form)]
+      (if (= 'like (first s))
+        `[[(= ~? ~(second s))]])))
+
 (defn init-db! []
   (e/resolve-api! (find-ns 'datomic.api))
   (d/delete-database uri)
   (d/create-database uri)
   (e/set-connection! uri)
+  (e/register-plugin! example-plugin)
   (f/set-custom-parser! [:collection/user] user-of)
   (f/set-custom-unparser! [:collection/user] :user/name)
   (e/transact e/conn schema-tx)
@@ -118,6 +124,7 @@
 
 (deftest test-query
   (is (boolean (init-db!)))
+  (is (= "Dune" (:book/title (a/fu {:book/title '(like "Dune")}))))
   (is (= "Excession" (:book/title (a/fu {:book/isbn "9876543210"}))))
   (is (= nil         (:book/title (a/fu {:book/isbn "987654321"}))))
   (is (= "Dune"      (:book/title (a/fu {:book/rating '(> 9M)}))))
@@ -217,3 +224,16 @@
   (is (nil? (:book/isbn (a/fu {:book/title "Neuromancer"}))))
   (is (boolean (a/fu {:user/dob (t/date-time 1981 10 14)})))
   (is (= "Alex" (:collection/user (a/fu {:collection/user "Alex" :collection/book {:book/title "The Player Of Games"}})))))
+
+(comment
+
+  (where-values '? "Dune")
+  (where-values '? '(like "Dune"))
+  (a/f {:book/title "Dune"})
+
+
+  (example-plugin '? '(like "blah"))
+
+  (where-values '? "blah")
+  (where-values '? '(likey "blah"))
+  )
