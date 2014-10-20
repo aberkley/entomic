@@ -17,22 +17,19 @@
 
 (declare function)
 
-(declare connect)
-
 (declare transactional-entities)
+
+(declare connect)
 
 (declare uri)
 
-(def datomic-api-symbols
-  #{'q 'db 'entity 'transact 'conn 'tempid 'function 'connect})
-
-(defn- intern-functions!
-  [ns symbols]
+(defn find-api-function
+  [ns symbol']
   (->> ns
        ns-interns
-       (filter (fn [[s f]] (contains? symbols s)))
-       (map (fn [[s f]] (intern 'entomic.core s f)))
-       doall))
+       (filter (fn [[s f]] (= s symbol')))
+       first
+       second))
 
 (def transactional-entities-code
   '{:lang :clojure
@@ -64,7 +61,7 @@
 
 (defn resolve-api!
   [ns-]
-  (intern-functions! ns- datomic-api-symbols))
+  (intern-ns ns- (find-ns 'entomic.core)))
 
 (defn set-connection!
   [my-uri]
