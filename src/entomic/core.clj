@@ -101,7 +101,7 @@
  (swap! plugins conj plugin))
 
 (defn plugin-values [? form]
-  (if (symbol? form)
+  (if (list? form)
    (reduce
     (fn [out plugin]
       (try (if-not out (plugin ? form))
@@ -111,14 +111,35 @@
 
 (defn- where-values
   [? form]
-  (cond
-   (vector? form) (vec
-                   (map (partial where-values ?) form))
-   (set? form) nil ;; or using rules
-   (map? form) (entity-wheres ? form)
-   (self-eval? form) [[`(= ~? ~form)]]
-   :else [(where-value ? form)]))
+  (if-let [ps (plugin-values ? form)]
+    ps
+   (cond
+    (vector? form) (vec
+                    (map (partial where-value ?) form))
+    (set? form) nil ;; or using rules
+    (map? form) (entity-wheres ? form)
+    (self-eval? form) [[`(= ~? ~form)]]
+    :else [(where-value ? form)])))
 
+(comment
+  (find-ids {:book/title '(like "Dune")})
+
+  (q '[:find ?entity
+       :in $ %
+       :where (entity? ?entity)]
+     (db conn)
+     (pprint (rule {:book/rating '[(> 6M) (< 9M)]})))
+  ;; old
+  [[[entity? ?entity]
+    [[(> ?rating 6M)]]
+    [[(< ?rating 9M)]]
+    [?entity :book/rating ?rating]]]
+  ;; new
+  '[[[entity? ?entity]
+     [[(> ?rating 6M)]]
+     [[(< ?rating 9M)]]
+     [?entity :book/rating ?rating]]]
+  )
 (defn- entity-where
   [?entity k v]
   (if (= v '?)
@@ -197,25 +218,6 @@
                   (map (fn [[k s]] (->> s (map (fn [v] [k v])))))
                   )]
     (expand-rule entity sets))))
-
-(comment
-  (entity-where '?entity :book/rating '[(> 6M) (< 9M)])
-  (q '[:find ?entity
-       :in $ %
-       :where (entity? ?entity)]
-     (db conn)
-     (pprint (rule {:book/rating '[(> 6M) (< 9M)]})))
-  ;; old
-  [[[entity? ?entity]
-    [[(> ?rating 6M)]]
-    [[(< ?rating 9M)]]
-    [?entity :book/rating ?rating]]]
-  ;; new
-  '[[[entity? ?entity]
-     [[(> ?rating 6M)]]
-     [[(< ?rating 9M)]]
-     [?entity :book/rating ?rating]]]
-  )
 
 (defn find-ids
   ([database entity]
