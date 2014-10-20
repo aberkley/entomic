@@ -91,26 +91,12 @@
 (defn- entity-wheres
   [?entity k v])
 
-(def plugins (atom []))
-
-(defn register-plugin!
-  [plugin]
- (swap! plugins conj plugin))
-
-(defn plugin-values [? form]
-  (if (symbol? form)
-   (reduce
-    (fn [out plugin]
-      (try (if-not out (plugin ? form))
-           (catch Exception e nil)))
-    nil
-    @plugins)))
-
 (defn- where-values
   [? form]
   (cond
+
    (vector? form) (vec
-                   (map (partial where-values ?) form))
+                   (map (partial where-value ?) form))
    (set? form) nil ;; or using rules
    (map? form) (entity-wheres ? form)
    (self-eval? form) [[`(= ~? ~form)]]
@@ -131,6 +117,11 @@
       (->> [?entity a ?]
            (merge where-val where-key)
            (filter identity)))))
+
+(comment
+  (entity-where '?entity :book/title "Dune")
+  (entity-where '?entity :book/title '?)
+  )
 
 (defn- entity-wheres
   [?entity entity]
@@ -194,25 +185,6 @@
                   (map (fn [[k s]] (->> s (map (fn [v] [k v])))))
                   )]
     (expand-rule entity sets))))
-
-(comment
-  (entity-where '?entity :book/rating '[(> 6M) (< 9M)])
-  (q '[:find ?entity
-       :in $ %
-       :where (entity? ?entity)]
-     (db conn)
-     (pprint (rule {:book/rating '[(> 6M) (< 9M)]})))
-  ;; old
-  [[[entity? ?entity]
-    [[(> ?rating 6M)]]
-    [[(< ?rating 9M)]]
-    [?entity :book/rating ?rating]]]
-  ;; new
-  '[[[entity? ?entity]
-     [[(> ?rating 6M)]]
-     [[(< ?rating 9M)]]
-     [?entity :book/rating ?rating]]]
-  )
 
 (defn find-ids
   ([database entity]
