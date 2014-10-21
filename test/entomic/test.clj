@@ -29,7 +29,8 @@
     :db/ident :book/title
     :db/valueType :db.type/string
     :db/cardinality :db.cardinality/one
-    :db.install/_attribute :db.part/db}
+    :db.install/_attribute :db.part/db
+    :db/fulltext true}
    {:db/id (d/tempid :db.part/db)
     :db/ident :book/author
     :db/valueType :db.type/string
