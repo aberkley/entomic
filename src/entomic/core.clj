@@ -121,40 +121,34 @@
     (self-eval? form) [[`(= ~? ~form)]]
     :else [(where-value ? form)])))
 
-(comment
-  (find-ids {:book/title '(like "Dune")})
+(defn fulltext? [form]
+  (try (-> form seq first (= 'fulltext))
+       (catch Exception e nil)))
 
-  (q '[:find ?entity
-       :in $ %
-       :where (entity? ?entity)]
-     (db conn)
-     (pprint (rule {:book/rating '[(> 6M) (< 9M)]})))
-  ;; old
-  [[[entity? ?entity]
-    [[(> ?rating 6M)]]
-    [[(< ?rating 9M)]]
-    [?entity :book/rating ?rating]]]
-  ;; new
-  '[[[entity? ?entity]
-     [[(> ?rating 6M)]]
-     [[(< ?rating 9M)]]
-     [?entity :book/rating ?rating]]]
-  )
+(defn fulltext-where [? attr form]
+  (let [s (seq form)
+        v (last s)]
+    `[[(~'fulltext ~'$ ~attr ~v) [[~?]]]]))
+
 (defn- entity-where
   [?entity k v]
-  (if (= v '?)
-    [[?entity k]]
-    (let [k? (self-eval? k)
-          a (find-attribute k)
-          ? (symbol (str '? (name a)))
-          ?' (symbol (str '? (name a) "'"))
-          where-key (if (not k?)
-                      [(clojure.walk/prewalk-replace {a ?} k) ?'])
-          val-sym (if k? ? ?')
-          where-val  (where-values val-sym v)]
-      (->> [?entity a ?]
-           (merge where-val where-key)
-           (filter identity)))))
+  (cond
+   (= v '?)
+   [[?entity k]]
+   (fulltext? v)
+   (fulltext-where ?entity k v)
+   :else
+   (let [k? (self-eval? k)
+         a (find-attribute k)
+         ? (symbol (str '? (name a)))
+         ?' (symbol (str '? (name a) "'"))
+         where-key (if (not k?)
+                     [(clojure.walk/prewalk-replace {a ?} k) ?'])
+         val-sym (if k? ? ?')
+         where-val  (where-values val-sym v)]
+     (->> [?entity a ?]
+          (merge where-val where-key)
+          (filter identity)))))
 
 (defn- entity-wheres
   [?entity entity]

@@ -125,6 +125,7 @@
 (deftest test-query
   (is (boolean (init-db!)))
   (is (= "Dune" (:book/title (a/fu {:book/title '(like "Dune")}))))
+  (is (= "Dune" (:book/title (a/fu {:book/title '(fulltext "Dune")}))))
   (is (= "Excession" (:book/title (a/fu {:book/isbn "9876543210"}))))
   (is (= nil         (:book/title (a/fu {:book/isbn "987654321"}))))
   (is (= "Dune"      (:book/title (a/fu {:book/rating '(> 9M)}))))
