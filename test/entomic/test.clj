@@ -138,6 +138,8 @@
                       (:collection/book
                        (a/fu {:collection/user {:user/name "Alex"}
                               :collection/book {:book/title "Excession"}})))))
+  (is (a/fu {:collection/user {:user/name #{"Alex" "Bill"}}
+            :collection/book {:book/title #{"Dune" "Excession"}}}))
   (is (= "Dune"      (:book/title (a/fu
                                    {:book/title #{"Dune" "Excession"}
                                     :book/rating '(> 4M)
