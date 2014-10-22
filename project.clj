@@ -6,7 +6,8 @@
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [com.datomic/datomic-free "0.9.4880.2" :scope "test"]
                  [org.clojars.aberkley/utilities "0.1.3-SNAPSHOT"]
-                 [clj-time "0.6.0"]]
+                 [clj-time "0.6.0"]
+                 [org.clojure/core.incubator "0.1.3"]]
   :offline? false
   :jvm-opts ["-Xmx768M"]
   :aot :all)

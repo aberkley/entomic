@@ -1,5 +1,6 @@
 (ns entomic.core
   (:use clojure.pprint
+        clojure.core.incubator
         entomic.coerce
         utilities.ns))
 
@@ -173,6 +174,44 @@
        (map (fn [rule] (into '[[entity? ?entity]] rule)))
        vec))
 
+(defn- expand-rule
+  [entity sets]
+  (->> sets
+       (reduce
+        (fn [agg new]
+          (if (seq agg)
+            (for [n new a agg]
+              (merge a n))
+            new))
+        [[]])
+       ;;first
+       (map (partial reduce (fn [m [ks v]] (assoc-in m ks v)) {}))
+       (map (partial merge entity))
+       (map (partial entity-wheres '?entity))
+       (map (fn [rule] (into '[[entity? ?entity]] rule)))
+       vec))
+
+(comment
+  (def y
+    (apply expand-rule x))
+
+
+  (reduce
+   (fn [agg new]
+     (if (seq agg)
+       (for [n new a agg]
+         (merge a n))
+       new))
+   [[]]
+   (second x))
+  (defn expand [a b]
+    )
+  (reduce expand
+   [[[[:book/author] "Frank"] [[:book/author] "Herbert"]]
+    [[[:book/title] "Dune"] [[:book/title] "Dune 2"]]])
+
+  )
+
 (defn prefix-rule-name
   [k]
   (-> k
@@ -187,6 +226,18 @@
 
 (declare entities)
 
+(defn keys-in [m]
+  (if (map? m)
+    (vec
+     (mapcat (fn [[k v]]
+               (let [sub (keys-in v)
+                     nested (map #(into [k] %) (filter (comp not empty?) sub))]
+                 (if (seq nested)
+                   nested
+                   [[k]])))
+             m))
+    []))
+
 (defn extract-sets
   [entity]
   (let [f (fn [[k v]] (set? v))
@@ -197,6 +248,28 @@
                   (filter f)
                   (map (fn [[k s]] (->> s (map (fn [v] [k v]))))))]
     [entity' sets]))
+
+(defn extract-sets
+  [entity]
+  (let [all-keys (keys-in entity)
+        set-keys (filter #(set? (get-in entity %)) all-keys)
+        entity' (reduce dissoc-in entity set-keys)
+        sets (map (fn [ks] [ks (get-in entity ks)]) set-keys)
+        sets' (map (fn [[k s]] (->> s (map (fn [v] [k v])))) sets)]
+    [entity' sets']))
+
+(comment
+  (pprint sets)
+  (second (extract-sets {:a {:b #{1 2}} :c 2 :d #{"a" "b"}}))
+
+
+  [[[:a :b] #{1 2}] [[:d] #{"a" "b"}]]
+
+
+  (def x (extract-sets {:book/rating 9.5M
+                   :book/title #{"Dune" "Dune 2"}
+                   :book/author #{"Frank" "Herbert"}}))
+  )
 
 (defprotocol Rule
   (rule [entity]))
@@ -216,10 +289,6 @@
   (rule [entity]
     (let [[entity' sets] (extract-sets entity)]
     (expand-rule entity' sets))))
-
-(comment
-  (find-ids {:book/title #{"Dune" "Dune 2"}})
-  )
 
 (defn find-ids
   ([database entity]
