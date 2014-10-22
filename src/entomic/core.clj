@@ -187,6 +187,17 @@
 
 (declare entities)
 
+(defn extract-sets
+  [entity]
+  (let [f (fn [[k v]] (set? v))
+        entity' (->> entity
+                     (filter (complement f))
+                     (into {}))
+        sets (->> entity
+                  (filter f)
+                  (map (fn [[k s]] (->> s (map (fn [v] [k v]))))))]
+    [entity' sets]))
+
 (defprotocol Rule
   (rule [entity]))
 
@@ -203,15 +214,12 @@
        (map prefix-rule)))
   java.lang.Object
   (rule [entity]
-    (let [f (fn [[k v]] (set? v))
-        entity' (->> entity
-                     (filter (complement f))
-                     (into {}))
-        sets (->> entity
-                  (filter f)
-                  (map (fn [[k s]] (->> s (map (fn [v] [k v])))))
-                  )]
-    (expand-rule entity sets))))
+    (let [[entity' sets] (extract-sets entity)]
+    (expand-rule entity' sets))))
+
+(comment
+  (find-ids {:book/title #{"Dune" "Dune 2"}})
+  )
 
 (defn find-ids
   ([database entity]
