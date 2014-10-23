@@ -95,6 +95,7 @@
     :book/rating 8.2M}
    {:db/id (d/tempid :db.part/user -6)
     :book/title "Matter"
+    :book/isbn "0000000000"
     :book/author "Iain M. Banks"}
    {:db/id (d/tempid :db.part/user -3)
     :user/name "Alex"
@@ -138,8 +139,9 @@
                       (:collection/book
                        (a/fu {:collection/user {:user/name "Alex"}
                               :collection/book {:book/title "Excession"}})))))
-  (is (a/fu {:collection/user {:user/name #{"Alex" "Bill"}}
-            :collection/book {:book/title #{"Dune" "Excession"}}}))
+  (is (a/f {:collection/user {:user/name #{"Alex" "Bill"}}
+            :collection/book {:book/title #{"Matter" "Excession"}
+                              :book/isbn "0000000000"}}))
   (is (= "Dune"      (:book/title (a/fu
                                    {:book/title #{"Dune" "Excession"}
                                     :book/rating '(> 4M)
@@ -228,16 +230,3 @@
   (is (nil? (:book/isbn (a/fu {:book/title "Neuromancer"}))))
   (is (boolean (a/fu {:user/dob (t/date-time 1981 10 14)})))
   (is (= "Alex" (:collection/user (a/fu {:collection/user "Alex" :collection/book {:book/title "The Player Of Games"}})))))
-
-(comment
-
-  (where-values '? "Dune")
-  (where-values '? '(like "Dune"))
-  (a/f {:book/title "Dune"})
-
-
-  (example-plugin '? '(like "blah"))
-
-  (where-values '? "blah")
-  (where-values '? '(likey "blah"))
-  )

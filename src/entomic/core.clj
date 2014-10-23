@@ -174,6 +174,15 @@
        (map (fn [rule] (into '[[entity? ?entity]] rule)))
        vec))
 
+(defn nested-merge
+  [m1 m2]
+  (reduce
+   (fn [m [k v]]
+     (let [v' (if (map? v) (nested-merge (get m k) v) v)]
+       (assoc m k v')))
+   m1
+   m2))
+
 (defn- expand-rule
   [entity sets]
   (->> sets
@@ -184,33 +193,11 @@
               (merge a n))
             new))
         [[]])
-       ;;first
        (map (partial reduce (fn [m [ks v]] (assoc-in m ks v)) {}))
-       (map (partial merge entity))
+       (map (partial nested-merge entity))
        (map (partial entity-wheres '?entity))
        (map (fn [rule] (into '[[entity? ?entity]] rule)))
        vec))
-
-(comment
-  (def y
-    (apply expand-rule x))
-
-
-  (reduce
-   (fn [agg new]
-     (if (seq agg)
-       (for [n new a agg]
-         (merge a n))
-       new))
-   [[]]
-   (second x))
-  (defn expand [a b]
-    )
-  (reduce expand
-   [[[[:book/author] "Frank"] [[:book/author] "Herbert"]]
-    [[[:book/title] "Dune"] [[:book/title] "Dune 2"]]])
-
-  )
 
 (defn prefix-rule-name
   [k]
@@ -240,17 +227,6 @@
 
 (defn extract-sets
   [entity]
-  (let [f (fn [[k v]] (set? v))
-        entity' (->> entity
-                     (filter (complement f))
-                     (into {}))
-        sets (->> entity
-                  (filter f)
-                  (map (fn [[k s]] (->> s (map (fn [v] [k v]))))))]
-    [entity' sets]))
-
-(defn extract-sets
-  [entity]
   (let [all-keys (keys-in entity)
         set-keys (filter #(set? (get-in entity %)) all-keys)
         entity' (reduce dissoc-in entity set-keys)
@@ -259,6 +235,20 @@
     [entity' sets']))
 
 (comment
+
+
+  (rule {:ownership/owner
+         {:user/name "Alex"
+          :user/user-addresses
+          {:user-address/address
+           {:address/formatted-address
+            #{"4 Times Square, New York, NY 10036, USA"
+              "6 Trafalgar Square, St. James's, London WC2N, UK"}}}}})
+
+  )
+
+(comment
+
   (pprint sets)
   (second (extract-sets {:a {:b #{1 2}} :c 2 :d #{"a" "b"}}))
 
