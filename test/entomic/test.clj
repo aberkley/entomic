@@ -35,7 +35,8 @@
     :db/ident :book/author
     :db/valueType :db.type/string
     :db/cardinality :db.cardinality/one
-    :db.install/_attribute :db.part/db}
+    :db.install/_attribute :db.part/db
+    :db/fulltext true}
    {:db/id (d/tempid :db.part/db)
     :db/ident :book/publishing-date
     :db/valueType :db.type/instant
@@ -45,7 +46,8 @@
     :db/ident :book/isbn
     :db/valueType :db.type/string
     :db/cardinality :db.cardinality/one
-    :db.install/_attribute :db.part/db}
+    :db.install/_attribute :db.part/db
+    :db/fulltext true}
    {:db/id (d/tempid :db.part/db)
     :db/ident :book/rating
     :db/valueType :db.type/bigdec
@@ -55,7 +57,8 @@
     :db/ident :user/name
     :db/valueType :db.type/string
     :db/cardinality :db.cardinality/one
-    :db.install/_attribute :db.part/db}
+    :db.install/_attribute :db.part/db
+    :db/fulltext true}
    {:db/id (d/tempid :db.part/db)
     :db/ident :user/dob
     :db/valueType :db.type/instant
@@ -97,6 +100,10 @@
     :book/title "Matter"
     :book/isbn "0000000000"
     :book/author "Iain M. Banks"}
+   {:db/id (d/tempid :db.part/user -7)
+    :book/title "From Hell"
+    :book/isbn "0000000001"
+    :book/author "Alan Moore"}
    {:db/id (d/tempid :db.part/user -3)
     :user/name "Alex"
     :user/dob (c/to-date
@@ -107,6 +114,13 @@
    {:db/id (d/tempid :db.part/user -5)
     :collection/user (d/tempid :db.part/user -3)
     :collection/book (d/tempid :db.part/user -6)}])
+
+(defn save-sequels! [n title author]
+  (->> n
+       (range 2)
+       (map (fn [n'] {:book/title (str title " " n')
+                     :book/author author}))
+       a/save!))
 
 (defn example-plugin [? form]
     (let [s (seq form)]
@@ -150,7 +164,9 @@
   (is (boolean (seq (a/ids {:book/isbn "9876543210"}))))
   (is (a/f? {:book/isbn "9876543210"}))
   (is (a/fu? {:book/isbn "9876543210"}))
-  (is (= 3 (count (a/f :book))))
+  (is (a/fu? #{{:book/title "Dune"}
+              {:book/author "Frank Herbert"}}))
+  (is (= 4 (count (a/f :book))))
   (is (boolean (a/update! [{:book/title "Dune" :book/isbn "9999999999"}] [:book/title])))
   (is (= 1 (count (a/ids {:book/title "Dune"}))))
   (is (a/fu? {:book/isbn "9999999999"}))

@@ -214,52 +214,34 @@
 (declare entities)
 
 (defn keys-in [m]
-  (if (map? m)
-    (vec
-     (mapcat (fn [[k v]]
-               (let [sub (keys-in v)
-                     nested (map #(into [k] %) (filter (comp not empty?) sub))]
-                 (if (seq nested)
-                   nested
-                   [[k]])))
-             m))
-    []))
+  (conj
+   (if (map? m)
+     (vec
+      (mapcat (fn [[k v]]
+                (let [sub (keys-in v)
+                      nested (map #(into [k] %) (filter (comp not empty?) sub))]
+                  (if (seq nested)
+                    nested
+                    [[k]])))
+              m))
+     [])
+   []))
 
 (defn extract-sets
   [entity]
-  (let [all-keys (keys-in entity)
-        set-keys (filter #(set? (get-in entity %)) all-keys)
-        entity' (reduce dissoc-in entity set-keys)
-        sets (map (fn [ks] [ks (get-in entity ks)]) set-keys)
-        sets' (map (fn [[k s]] (->> s (map (fn [v] [k v])))) sets)]
-    [entity' sets']))
-
-(comment
-
-
-  (rule {:ownership/owner
-         {:user/name "Alex"
-          :user/user-addresses
-          {:user-address/address
-           {:address/formatted-address
-            #{"4 Times Square, New York, NY 10036, USA"
-              "6 Trafalgar Square, St. James's, London WC2N, UK"}}}}})
-
-  )
-
-(comment
-
-  (pprint sets)
-  (second (extract-sets {:a {:b #{1 2}} :c 2 :d #{"a" "b"}}))
-
-
-  [[[:a :b] #{1 2}] [[:d] #{"a" "b"}]]
-
-
-  (def x (extract-sets {:book/rating 9.5M
-                   :book/title #{"Dune" "Dune 2"}
-                   :book/author #{"Frank" "Herbert"}}))
-  )
+  (if (set? entity)
+    (let [entities (map extract-sets entity)]
+      (reduce (fn [[entity' keys'] [entity keys]]
+                [(merge entity' entity)
+                 (into keys' keys)])
+           [{} []]
+           entities))
+    (let [all-keys (keys-in entity)
+          set-keys (filter #(set? (get-in entity %)) all-keys)
+          entity' (reduce dissoc-in entity set-keys)
+          sets (map (fn [ks] [ks (get-in entity ks)]) set-keys)
+          sets' (map (fn [[k s]] (->> s (map (fn [v] [k v])))) sets)]
+      [entity' sets'])))
 
 (defprotocol Rule
   (rule [entity]))
