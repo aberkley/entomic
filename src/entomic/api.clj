@@ -3,48 +3,55 @@
             [entomic.format :only [parse unparse unparse-entity verify-unique] :as ft]))
 
 (defn ids
-  [x]
+  [entomic x]
   (->> x
-       ft/parse-entity
-       e/find-ids))
+       (ft/parse-entity entomic)
+       (e/find-ids entomic)))
 
 (defn id
-  [x]
+  [entomic x]
   (->> x
-       ids
+       (ids entomic)
        (map first)
        (ft/verify-unique x)))
 
 (defn f?
-  [x]
+  [entomic x]
   (->> x
-       ids
+       (ids entomic)
        seq
        boolean))
 
 (defn fu?
-  [x]
+  [entomic x]
   (->> x
-       ids
+       (ids entomic)
        count
        (= 1)))
 
 (defn f
-  [x]
+  [entomic x]
   (->> x
-       ft/parse-entity
-       e/find-
-       ft/unparse))
+       (ft/parse-entity entomic)
+       (e/find- entomic)
+       (ft/unparse entomic)))
+
+(defn f
+  [entomic x]
+  (->> x
+       (ft/parse-entity entomic)
+       (e/find- entomic)
+       (ft/unparse entomic)))
 
 (defn fu
-  [x]
+  [entomic x]
   (->> x
-       f
+       (f entomic)
        (ft/verify-unique x)))
 
 (defn- commits!
-  [id-types entities keys attributes]
-  (e/transact! id-types (ft/resolve- entities) keys attributes))
+  [entomic id-types entities keys attributes]
+  (e/transact! entomic id-types (ft/resolve- entomic entities) keys attributes))
 
 (defn- expand-and-merge-args
   [cum [id-type entities key attribute]]
@@ -54,31 +61,31 @@
          (into cum))))
 
 (defn as-transaction!
-  [& args]
-  (apply commits!
+  [entomic & args]
+  (apply (partial commits! entomic)
    (apply map vector
           (reduce expand-and-merge-args [] args))))
 
 (defn save!
-  ([entities key]
-     (as-transaction! [:save entities key]))
-  ([entities]
-     (save! entities [])))
+  ([entomic entities key]
+     (as-transaction! entomic [:save entities key]))
+  ([entomic entities]
+     (save! entomic entities [])))
 
 (defn update!
-  ([entities]
-     (update! entities []))
-  ([entities key]
-     (as-transaction! [:update entities key])))
+  ([entomic entities]
+     (update! entomic entities []))
+  ([entomic entities key]
+     (as-transaction! entomic [:update entities key])))
 
 (defn retract!
-  ([entities key attribute]
-     (as-transaction! [:retract (filter attribute entities) key attribute]))
-  ([entities attribute]
-     (retract! entities [] attribute)))
+  ([entomic entities key attribute]
+     (as-transaction! entomic [:retract (filter attribute entities) key attribute]))
+  ([entomic entities attribute]
+     (retract! entomic entities [] attribute)))
 
 (defn retract-entities!
-  ([entities key]
-     (as-transaction! [:retract-entities entities key]))
-  ([entities]
-     (retract-entities! entities [])))
+  ([entomic entities key]
+     (as-transaction! entomic [:retract-entities entities key]))
+  ([entomic entities]
+     (retract-entities! entomic entities [])))

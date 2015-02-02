@@ -6,11 +6,10 @@
             [clj-time.format :as fmt]
             [entomic.core :as e]
             [entomic.format :as f]
-            [entomic.api :as a]))
+            [entomic.api :as a]
+            [entomic.system :as sys]))
 
 (def uri "datomic:mem://test")
-
-;;(def uri "datomic:free://localhost:4334/test")
 
 (defprotocol User
   (user-of [this]))
@@ -18,8 +17,7 @@
 (extend-protocol User
   java.lang.String
   (user-of [p-name]
-    (:db/id
-     (a/fu {:user/name p-name})))
+    {:user/name p-name})
   java.lang.Object
   (user-of [this]
     this))
@@ -127,122 +125,130 @@
       (if (= 'like (first s))
         `[[(= ~? ~(second s))]])))
 
-(defn init-db! []
-  (e/resolve-api! (find-ns 'datomic.api))
+(def entomic (atom nil))
+
+(defn new-test-system []
   (d/delete-database uri)
   (d/create-database uri)
-  (e/set-connection! uri)
-  (e/register-plugin! example-plugin)
-  (f/set-custom-parser! [:collection/user] user-of)
-  (f/set-custom-unparser! [:collection/user] :user/name)
-  (e/transact e/conn schema-tx)
-  (e/transact e/conn data-tx))
+  (d/transact (d/connect uri) schema-tx)
+  (d/transact (d/connect uri) data-tx)
+  (.start
+   (sys/new-entomic uri
+                    (find-ns 'datomic.api)
+                    {:parsers {:collection/user user-of}
+                     :unparsers {:collection/user :user/name
+                                 :user/dob (partial fmt/unparse (fmt/formatters :date))}}
+                    [example-plugin])))
+
+(def entomic (-> (new-test-system)
+                 .start
+                 :entomic))
 
 (deftest test-query
-  (is (boolean (init-db!)))
-  (is (= "Dune" (:book/title (a/fu {:book/title '(like "Dune")}))))
-  (is (= "Dune" (:book/title (a/fu {:book/title '(fulltext "Dune")}))))
-  (is (= "Excession" (:book/title (a/fu {:book/isbn "9876543210"}))))
-  (is (= nil         (:book/title (a/fu {:book/isbn "987654321"}))))
-  (is (= "Dune"      (:book/title (a/fu {:book/rating '(> 9M)}))))
-  (is (= "Excession" (:book/title (a/fu {:book/rating '[(> 6M) (< 9M)]}))))
-  (is (= nil         (:book/title (a/fu {:book/rating '[(> 6M) (< 7M)]}))))
-  (is (= "Excession" (:book/title (a/fu {'(bigdec :book/isbn) 9876543210M}))))
-  (is (= "Excession" (:book/title (a/fu {'(bigdec :book/isbn) '(> 1234567890)}))))
+  (is (= "Excession" (:book/title (a/fu entomic {:book/isbn "9876543210"}))))
+  (is (= "Dune" (:book/title (a/fu entomic {:book/title '(like "Dune")}))))
+  (is (= "Dune" (:book/title (a/fu entomic {:book/title '(fulltext "Dune")}))))
+  (is (= nil         (:book/title (a/fu entomic {:book/isbn "987654321"}))))
+  (is (= "Dune"      (:book/title (a/fu entomic {:book/rating '(> 9M)}))))
+  (is (= "Excession" (:book/title (a/fu entomic {:book/rating '[(> 6M) (< 9M)]}))))
+  (is (= nil         (:book/title (a/fu entomic {:book/rating '[(> 6M) (< 7M)]}))))
+  (is (= "Excession" (:book/title (a/fu entomic {'(bigdec :book/isbn) 9876543210M}))))
+  (is (= "Excession" (:book/title (a/fu entomic {'(bigdec :book/isbn) '(> 1234567890)}))))
   (is (= "Excession" (:book/title
                       (:collection/book
-                       (a/fu {:collection/user {:user/name "Alex"}
-                              :collection/book {:book/title "Excession"}})))))
-  (is (a/f {:collection/user {:user/name #{"Alex" "Bill"}}
-            :collection/book {:book/title #{"Matter" "Excession"}
-                              :book/isbn "0000000000"}}))
-  (is (= "Dune"      (:book/title (a/fu
+                       (a/fu entomic {:collection/user {:user/name "Alex"}
+                                      :collection/book {:book/title "Excession"}})))))
+  (is (= 1 (count (a/f entomic {:collection/user {:user/name #{"Alex" "Bill"}}
+                             :collection/book {:book/title #{"Matter" "Excession"}
+                                               :book/isbn "0000000000"}}))))
+  (is (= "Dune"      (:book/title (a/fu entomic
                                    {:book/title #{"Dune" "Excession"}
                                     :book/rating '(> 4M)
                                     :book/author #{"Frank Herbert" "Tom Smith"}}))))
-  (is (= java.lang.Long (type (a/id {:book/isbn "9876543210"}))))
-  (is (boolean (seq (a/ids {:book/isbn "9876543210"}))))
-  (is (a/f? {:book/isbn "9876543210"}))
-  (is (a/fu? {:book/isbn "9876543210"}))
-  (is (a/fu? #{{:book/title "Dune"}
-              {:book/author "Frank Herbert"}}))
-  (is (= 4 (count (a/f :book))))
-  (is (boolean (a/update! [{:book/title "Dune" :book/isbn "9999999999"}] [:book/title])))
-  (is (= 1 (count (a/ids {:book/title "Dune"}))))
-  (is (a/fu? {:book/isbn "9999999999"}))
-  (is (boolean (a/update! [{:book/title "Dune" :book/isbn "1111111111" :book/publishing-date (c/to-date
+  (is (= java.lang.Long (type (a/id entomic {:book/isbn "9876543210"}))))
+  (is (boolean (seq (a/ids entomic {:book/isbn "9876543210"}))))
+  (is (a/f? entomic {:book/isbn "9876543210"}))
+  (is (a/fu? entomic {:book/isbn "9876543210"}))
+  (is (a/fu? entomic #{{:book/title "Dune"}
+                       {:book/author "Frank Herbert"}}))
+  (is (= 4 (count (a/f entomic :book))))
+  (is (boolean (a/update! entomic [{:book/title "Dune" :book/isbn "9999999999"}] [:book/title])))
+  (is (= 1 (count (a/ids entomic {:book/title "Dune"}))))
+  (is (a/fu? entomic {:book/isbn "9999999999"}))
+  (is (boolean (a/update! entomic [{:book/title "Dune" :book/isbn "1111111111" :book/publishing-date (c/to-date
                                                                                               (t/date-time 2002 4 12))}])))
-  (is (= 2 (count (a/ids {:book/title "Dune"}))))
-  (is (boolean (a/save! [{:book/title "Excession" :book/isbn "2222222222"}] [:book/title])))
-  (is (boolean (a/save! [{:book/title "Excession"
+  (is (= 2 (count (a/ids entomic {:book/title "Dune"}))))
+  (is (boolean (a/save! entomic [{:book/title "Excession" :book/isbn "2222222222"}] [:book/title])))
+  (is (boolean (a/save! entomic [{:book/title "Excession"
                           :book/author "Iain M. Banks"
                           :book/publishing-date (c/to-date
                                                  (t/date-time 2003 5 28))
                           :book/isbn "9876543210"
                           :book/rating 8.2M}])))
-  (is (= 1 (count (a/ids {:book/title "Excession"}))))
-  (is (boolean (a/retract! [{:book/title "Excession"
+  (is (= 1 (count (a/ids entomic {:book/title "Excession"}))))
+  (is (boolean (a/retract! entomic [{:book/title "Excession"
                              :book/rating 8.2M}]
                            [:book/title]
                            :book/rating)))
-  (is (nil? (:book/rating (a/fu {:book/title "Excession"}))))
-  (is (boolean (a/retract-entities! [{:book/title "Excession"}] [:book/title])))
-  (is (nil? (a/fu {:book/title "Excession"})))
-  (is (boolean (a/retract-entities! [{:book/title "Dune"
+  (is (nil? (:book/rating (a/fu entomic {:book/title "Excession"}))))
+  (is (boolean (a/retract-entities! entomic [{:book/title "Excession"}] [:book/title])))
+  (is (nil? (a/fu entomic {:book/title "Excession"})))
+  (is (boolean (a/retract-entities! entomic [{:book/title "Dune"
                                       :book/author "Frank Herbert"}])))
-  (is (nil? (a/fu {:book/title "Dune"
+  (is (nil? (a/fu entomic {:book/title "Dune"
                    :book/author "Frank Herbert"})))
   (is (= java.lang.Long
          (type
           (:collection/user
-           (f/resolve-entity
+           (f/resolve-entity entomic
             {:collection/user {:user/name "Alex"}
              :collection/book {:book/title "Matter"}})))))
   (is (= java.math.BigDecimal
          (type
           (:book/rating
-           (f/parse-entity
+           (f/parse-entity entomic
             {:book/rating "9.5"
              :db/id 17592186045420})))))
   (is (= java.lang.String
          (type
           (:book/isbn
-           (f/parse-entity
+           (f/parse-entity entomic
             {:book/isbn 1234567890})))))
   (is (= java.util.Date
          (type
           (:book/publishing-date
-           (f/parse-entity
-            {:book/publishing-date (clj-time.core/date-time 2014 1 1)})))))
+           (f/parse-entity entomic
+            {:book/publishing-date (t/date-time 2014 1 1)})))))
   (is (= org.joda.time.DateTime
          (type
           (:book/publishing-date
-           (f/unparse-entity {:book/publishing-date (c/to-date (t/date-time 2014 1 1))})))))
-  (is (boolean (f/set-custom-unparser! [:book/publishing-date] (partial fmt/unparse (fmt/formatters :date)))))
-  (is (string?
-       (:book/publishing-date
-        (f/unparse-entity {:book/publishing-date (c/to-date (t/date-time 2014 1 1))}))))
-  (is (nil? (f/unparse-entity nil)))
+           (f/unparse-entity entomic {:book/publishing-date (c/to-date (t/date-time 2014 1 1))})))))
+  (is (= java.lang.String
+         (type
+          (:user/dob
+           (f/unparse-entity entomic {:user/dob (c/to-date (t/date-time 2014 1 1))})))))
+  (is (nil? (f/unparse-entity entomic nil)))
   (is (= java.lang.Long
          (type
           (:collection/user
-           (f/parse-entity {:collection/user "Alex"})))))
-  (is (boolean (a/save! [{:book/title "The Player Of Games"
+           (f/resolve-entity entomic {:collection/user "Alex"})))))
+  (is (boolean (a/save! entomic [{:book/title "The Player Of Games"
                           :book/author "Iain M. Banks"}])))
-  (is (boolean (a/save! [{:collection/user "Alex"
-                          :collection/book {:book/title "The Player Of Games"}}])))
-  (is (= 3 (count (a/f {:collection/user "Alex"}))))
-  (is (boolean (a/save! [{:user/name "Book Club" :user/type :user.type/charity}])))
-  (is (boolean (a/fu {:user/type :user.type/charity})))
-  (is (boolean (a/save! [{:book/title "Neuromancer" :book/author "William Gibson" :book/isbn "1122334455"}])))
+  (is (boolean (a/save! entomic [{:collection/user "Alex"
+                                  :collection/book {:book/title "The Player Of Games"}}])))
+  (is (= 3 (count (a/f entomic {:collection/user "Alex"}))))
+  (is (boolean (a/save! entomic [{:user/name "Book Club" :user/type :user.type/charity}])))
+  (is (boolean (a/fu entomic {:user/type :user.type/charity})))
+  (is (boolean (a/save! entomic [{:book/title "Neuromancer" :book/author "William Gibson" :book/isbn "1122334455"}])))
   (is (boolean
-       (a/as-transaction!
+       (a/as-transaction! entomic
         [:update [{:book/title "Neuromancer" :book/rating "9.5"}] [:book/title]]
         [:retract [{:book/title "Neuromancer" :book/isbn "1122334455"}] [:book/title] :book/isbn]
         [:save [{:book/title "The Algebraist" :book/author "Iain M. Banks"}]])))
-  (is (boolean (a/fu {:book/title "Neuromancer"})))
-  (is (= 9.5M (:book/rating (a/fu {:book/title "Neuromancer"}))))
-  (is (boolean (seq (a/f {:book/title '?}))))
-  (is (nil? (:book/isbn (a/fu {:book/title "Neuromancer"}))))
-  (is (boolean (a/fu {:user/dob (t/date-time 1981 10 14)})))
-  (is (= "Alex" (:collection/user (a/fu {:collection/user "Alex" :collection/book {:book/title "The Player Of Games"}})))))
+  (is (boolean (a/fu entomic {:book/title "Neuromancer"})))
+  (is (= 9.5M (:book/rating (a/fu entomic {:book/title "Neuromancer"}))))
+  (is (boolean (seq (a/f entomic {:book/title '?}))))
+  (is (nil? (:book/isbn (a/fu entomic {:book/title "Neuromancer"}))))
+  (is (boolean (a/fu entomic {:user/dob (t/date-time 1981 10 14)})))
+  (is (= "Alex" (:collection/user (a/fu entomic {:collection/user "Alex"
+                                                 :collection/book {:book/title "The Player Of Games"}})))))

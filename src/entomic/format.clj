@@ -12,20 +12,8 @@
       0 nil
       (throw (Exception. (str "more than one entity found for: " in)))))
 
-(defonce custom-parsers (atom {}))
-
-(defonce custom-unparsers (atom {}))
-
-(defn set-custom!
-  [a attributes function]
-  (swap! a (partial reduce (fn [m a] (assoc m a function))) attributes))
-
-(def set-custom-unparser! (partial set-custom! custom-unparsers))
-
-(def set-custom-parser! (partial set-custom! custom-parsers))
-
 (defn- attribute-types
-  [entity]
+  [entomic entity]
   (let [keyset (->> entity
                     keys
                     (filter keyword?)
@@ -33,7 +21,7 @@
     (if (seq keyset)
       (->> keyset
            (assoc {} :db/ident)
-           e/find-
+           (e/find- entomic)
            (map (juxt :db/ident :db/valueType))
            (into {}))
       {})))
@@ -56,104 +44,88 @@
 (defn all-types? [x] true)
 
 (defprotocol Ref
-  (parse-ref [x])
-  (resolve-ref [x]))
+  (parse-ref [x entomic])
+  (resolve-ref [x entomic]))
 
-(extend-protocol Ref
-  java.lang.Long
-  (parse-ref [x]
-    x)
-  clojure.lang.Keyword
-  (parse-ref [x]
-    {:db/ident x})
-  (resolve-ref [x]
-    (resolve-ref
-     (parse-ref x)))
-  java.lang.Object
-  (parse-ref [x]
+(defn ref-type [_ x]
+  (type x))
+
+(defmulti parse-ref ref-type)
+
+(defmethod parse-ref :default
+  [entomic x]
+  x)
+
+(defmethod parse-ref clojure.lang.Keyword
+  [entomic x]
+  {:db/ident x})
+
+(defmulti resolve-ref ref-type)
+
+(defmethod resolve-ref clojure.lang.Keyword
+  [entomic x]
+  (resolve-ref entomic
+   (parse-ref entomic x)))
+
+(defmethod resolve-ref :default
+  [entomic x]
     (->> x
-         e/find-
+         (e/find- entomic)
          (verify-unique x)
-         :db/id)))
+         :db/id))
 
-(def parse-map
+(defn parse-map [entomic]
   {:db.type/bigdec  [string-or-number? bigdec]
    :db.type/string  [number? str]
    :db.type/bigint  [string-or-number? bigint]
    :db.type/instant [(type-match? [org.joda.time.DateTime org.joda.time.LocalDate]) c/to-date]
-   :db.type/ref     [all-types? parse-ref]
+   :db.type/ref     [all-types? (partial parse-ref entomic)]
    :db.type/keyword [string? keyword]})
 
 (def unparse-map
   {:db.type/instant c/to-date-time})
 
-(defn custom-parser
-  [k]
-  (get @custom-parsers k))
-
 (defn default-parser
-  [d-type k v]
+  [entomic d-type k v]
   (if d-type
-    (if-let [[pred parser] (d-type parse-map)]
+    (if-let [[pred parser] (d-type (parse-map entomic))]
       (if (and (keyword? k)
                (pred v))
         parser))))
 
-(defn- parser
-  [d-type k v]
-  (or (custom-parser k)
-      (default-parser d-type k v)
-      identity))
-
 (defn- parse-value
-  [d-type k v]
-  ((parser d-type k v) v))
+  [{{parsers :parsers} :custom-formats :as entomic} d-type k v]
+  (if-let [f (get parsers k)]
+    (f v)
+    (if-let [f (default-parser entomic d-type k v)]
+      (f v)
+      v)))
 
-(defn- ref-resolver
-  [d-type]
-  (if (= d-type :db.type/ref)
-    parse-ref
-    identity))
-
-(defn- resolver
-  [d-type k v]
-  (comp
-   (ref-resolver d-type)
-   (or (parser d-type k v)
-       identity)))
-
-(defn resolve-value
-  [d-type k v]
-  ((resolver d-type k v) v))
-
-(defn- custom-unparser
-  [k]
-  (get @custom-unparsers k))
-
-(defn- unparser
-  [d-type k]
-  (if d-type
-    (comp
-     (or (custom-unparser k)
-         identity)
-     (or (d-type unparse-map)
-         identity))
-    identity))
+(defn- resolve-value
+  [{{parsers :parsers} :custom-formats :as entomic} d-type k v]
+  (let [v' (if-let [f (get parsers k)] (f v) v)]
+   (if (= d-type :db.type/ref)
+     (resolve-ref entomic v')
+     (if-let [f (default-parser entomic d-type k v')]
+       (f v')
+       v'))))
 
 (defn- unparse-value
-  [d-type k v]
-  ((unparser d-type k) v))
+  [{{unparsers :unparsers} :custom-formats} d-type k v]
+  (let [v' (if-let [u (get unparse-map d-type)] (u v) v)]
+    (if-let [u (get unparsers k)] (u v') v')))
 
 (defn- modify-entity-values
-  [f entity]
-  (try
-   (if entity
-     (let [a-map (attribute-types entity)]
-       (->> entity
-            (into [])
-            (map (fn [[k v]] [k (f (get a-map k) k v)]))
-            (into {}))))
-   (catch Exception e entity)))
+  [f entomic entity]
+  (if (or (keyword? entity)
+          (set? entity)
+          (nil? entity))
+    entity
+    (let [a-map (attribute-types entomic entity)]
+      (->> entity
+           (into [])
+           (map (fn [[k v]] [k (f entomic (get a-map k) k v)]))
+           (into {})))))
 
 (def parse-entity (partial modify-entity-values parse-value))
 
@@ -162,89 +134,13 @@
 (def resolve-entity (partial modify-entity-values resolve-value))
 
 (defn parse
-  [entities]
-  (map parse-entity entities))
+  [entomic entities]
+  (map (partial parse-entity entomic) entities))
 
 (defn unparse
-  [entities]
-  (map unparse-entity entities))
+  [entomic entities]
+  (map (partial unparse-entity entomic) entities))
 
 (defn resolve-
-  [entities]
-  (map resolve-entity entities))
-
-(declare extract-entities)
-
-(defn entity? [x]
-  (and (map? x)
-       (not (contains? x :part))))
-
-(defn- collection-of-entities? [x]
-  (and (coll? x)
-       (every? entity? x)))
-
-(defn- extract-child
-  [[m ts id] [k v]]
-  (cond
-   (entity? v)
-   [(assoc m k (e/tempid :db.part/user id))
-    (conj ts (assoc v :db/id id))
-    (dec id)]
-   (collection-of-entities? v)
-   (let [[ts' id' _] (extract-entities [] id v)
-         v' (map :db/id ts')
-         v'' (map (partial e/tempid :db.part/user) v')
-         ]
-     [(assoc m k v')
-      (into ts ts')
-      id'])
-   :else
-   [(assoc m k v)
-    ts
-    id]))
-
-(defn- extract-children
-  [id entity]
-  (reduce
-   extract-child
-   [{} [] id]
-   entity))
-
-(defn- extract-and-merge-children
-  [[es ts id] e]
-  (let [[e' ts' id'] (extract-children id e)]
-    [(conj es e')
-     (into ts ts')
-     id']))
-
-(defn- with-ids
-  [id entities]
-  (reduce
-   (fn [[id' entities'] entity]
-     (if (:db/id entity)
-       [id' (conj entities' entity)]
-       [(dec id') (conj entities' (assoc entity :db/id (e/tempid :db.part/user id')))]))
-   [id []]
-   entities))
-
-(defn- extract-entities
-  [ts id entities]
-  (let [[id' entities'] (with-ids id entities)
-        [ts'' entities'' id''] (reduce extract-and-merge-children [[] [] id'] entities')
-        ts''' (into ts ts'')
-        entities''' (flatten entities'')
-        out [ts''' id'' entities''']]
-    (if (seq entities''')
-      (apply extract-entities out)
-      out)))
-
-(defn to-transactions [entities]
-  (->> entities
-       (extract-entities [] -1)
-       first
-       (map (fn [entity]
-              (update-in entity
-                         [:db/id]
-                         #(if (number? %)
-                            (e/tempid :db.part/user %)
-                            %))))))
+  [entomic entities]
+  (map (partial resolve-entity entomic) entities))
