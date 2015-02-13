@@ -31,8 +31,46 @@
 (defmethod rule :default
   [{:keys [plugins] :as entomic} entity]
   (let [[entity' sets] (extract-sets entity)]
-    (expand-rule plugins entity' sets)))
+    (rules plugins entity' sets)))
 
+(defn find-history-ids
+  [{:keys [datomic] :as entomic} entity]
+  (let [{:keys [q history]} datomic]
+    (q '[:find ?entity ?transaction
+         :in $ %
+         :where (entity? ?entity ?transaction)]
+       (history (database entomic))
+       (history-rules entomic entity))))
+
+(comment
+  (entity-wheres {} '?entity {:book/author "George Orwell"})
+  (history-rules {} {:book/author "George Orwell"} [])
+
+  (create-history)
+
+  (find-history-ids entomic.test/entomic {:book/author "Iain M. Banks"})
+
+  (defn entity-as-of [[eid tx]]
+    (let [database (d/db (d/connect uri))]
+      [(d/entity database tx)
+       (d/entity (d/as-of database tx) eid)]))
+
+  (->> (d/q
+        '[:find ?tx ?e
+          :in $
+          :where
+          [?e :book/author "George Orwell"]
+          [?e :book/isbn "2" ?tx]]
+        (d/history (d/db (d/connect uri))))
+       sort
+       ;;(mapv #(d/entity (d/as-of (d/db (d/connect uri)) (first %)) eid))
+       (map entity-as-of)
+       (map (partial map #(zipmap (keys %) (vals %))))
+       (map (fn [[tx e]] (merge tx e)))
+       (filter #(= "2" (:book/isbn %)))
+       )
+
+  )
 
 (defn find-ids
   [{:keys [datomic] :as entomic} entity]

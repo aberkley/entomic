@@ -252,3 +252,14 @@
   (is (boolean (a/fu entomic {:user/dob (t/date-time 1981 10 14)})))
   (is (= "Alex" (:collection/user (a/fu entomic {:collection/user "Alex"
                                                  :collection/book {:book/title "The Player Of Games"}})))))
+
+(defn create-history! []
+  (a/save! entomic [{:book/title "1984" :book/author "George Orwell"}])
+  (a/update! entomic [{:book/title "1984" :book/isbn "1"}] [:book/title])
+  (a/update! entomic [{:book/title "1984" :book/isbn "2"}] [:book/title])
+  (a/update! entomic [{:book/title "1984" :book/isbn "3"}] [:book/title])
+  (a/update! entomic [{:book/title "1984" :book/author "G. Orwell"}] [:book/title]))
+
+(deftest test-history
+  (create-history!)
+  (is (= "3" (:book/isbn (a/fu entomic {:book/title "1984"})))))

@@ -87,7 +87,7 @@
    m1
    m2))
 
-(defn expand-rule
+(defn- expand-rule
   [{:keys [plugins]} entity sets]
   (->> sets
        (reduce
@@ -99,8 +99,17 @@
         [[]])
        (map (partial reduce (fn [m [ks v]] (assoc-in m ks v)) {}))
        (map (partial nested-merge entity))
-       (map (partial entity-wheres plugins '?entity))
+       (map (partial entity-wheres plugins '?entity))))
+
+(defn rules [plugins entity sets]
+  (->> (expand-rule plugins entity sets)
        (map (fn [rule] (into '[[entity? ?entity]] rule)))
+       vec))
+
+(defn history-rules [plugins entity sets]
+  (->> (expand-rule plugins entity sets)
+       (map (fn [rule] (into rule '[[?transaction _ _ ?entity]])))
+       (map (fn [rule] (into '[[entity? ?entity ?transaction]] rule)))
        vec))
 
 (defn prefix-rule-name
