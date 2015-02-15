@@ -8,70 +8,6 @@
 
 (declare entities)
 
-(defprotocol Rule
-  (rule [entity entomic]))
-
-(defn query-type [_ q]
-  (type q))
-
-(defmulti rule query-type)
-
-(defmethod rule clojure.lang.Keyword
-  [entomic prefix]
-  (let [q (get-in entomic [:datomic :q])]
-    (->> (q '[:find ?e
-              :where
-              [?e :db/ident]]
-            (database entomic))
-         (entities entomic)
-         (map :db/ident)
-         (filter #(= prefix (attribute-prefix %)))
-         (map prefix-rule))))
-
-(defmethod rule :default
-  [{:keys [plugins] :as entomic} entity]
-  (let [[entity' sets] (extract-sets entity)]
-    (rules plugins entity' sets)))
-
-(defn find-history-ids
-  [{:keys [datomic] :as entomic} entity]
-  (let [{:keys [q history]} datomic]
-    (q '[:find ?entity ?transaction
-         :in $ %
-         :where (entity? ?entity ?transaction)]
-       (history (database entomic))
-       (history-rules entomic entity))))
-
-(comment
-  (entity-wheres {} '?entity {:book/author "George Orwell"})
-  (history-rules {} {:book/author "George Orwell"} [])
-
-  (create-history)
-
-  (find-history-ids entomic.test/entomic {:book/author "Iain M. Banks"})
-
-  (defn entity-as-of [[eid tx]]
-    (let [database (d/db (d/connect uri))]
-      [(d/entity database tx)
-       (d/entity (d/as-of database tx) eid)]))
-
-  (->> (d/q
-        '[:find ?tx ?e
-          :in $
-          :where
-          [?e :book/author "George Orwell"]
-          [?e :book/isbn "2" ?tx]]
-        (d/history (d/db (d/connect uri))))
-       sort
-       ;;(mapv #(d/entity (d/as-of (d/db (d/connect uri)) (first %)) eid))
-       (map entity-as-of)
-       (map (partial map #(zipmap (keys %) (vals %))))
-       (map (fn [[tx e]] (merge tx e)))
-       (filter #(= "2" (:book/isbn %)))
-       )
-
-  )
-
 (defn find-ids
   [{:keys [datomic] :as entomic} entity]
   (let [q (:q datomic)]
@@ -80,6 +16,15 @@
          :where (entity? ?entity)]
        (database entomic)
        (rule entomic entity))))
+
+(defn find-history-ids
+  [{:keys [datomic] :as entomic} entity & [attr value]]
+  (let [{:keys [q history]} datomic]
+    (q '[:find ?entity ?transaction
+         :in $ %
+         :where (entity? ?entity ?transaction)]
+       (history (database entomic))
+       (history-rule entomic entity))))
 
 (defn- decorate-entity
   [{{entity :entity} :datomic :as entomic} entity']
@@ -123,3 +68,20 @@
     (->> partial-entity
          (find-ids entomic)
          (entities entomic))))
+
+(defn entity-as-of [{:keys [datomic] :as entomic} [eid tx]]
+  (let [{:keys [as-of entity]} datomic
+        d (database entomic)]
+      [(entity d tx)
+       (entity (as-of d tx) eid)]))
+
+(defn find-history
+  [entomic partial-entity & [attr value]]
+  (let [history (->> (find-history-ids entomic partial-entity)
+                     (sort-by second)
+                     (map (partial entity-as-of entomic))
+                     (map (partial map #(zipmap (keys %) (vals %))))
+                     (map (fn [[tx e]] (merge tx e))))]
+    (if (and attr value)
+      (filter (fn [e] (= (attr e) value)) history)
+      history)))

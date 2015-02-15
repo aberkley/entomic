@@ -1,4 +1,4 @@
-(defproject org.clojars.aberkley/entomic "2.1.0-SNAPSHOT"
+(defproject org.clojars.aberkley/entomic "2.1.1-SNAPSHOT"
   :description "FIXME: write description"
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"

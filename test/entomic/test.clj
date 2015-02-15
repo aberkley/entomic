@@ -262,4 +262,5 @@
 
 (deftest test-history
   (create-history!)
-  (is (= "3" (:book/isbn (a/fu entomic {:book/title "1984"})))))
+  (is (= "3" (:book/isbn (a/fu entomic {:book/title "1984"}))))
+  (is (= 5 (count (a/h entomic {:book/author "George Orwell"})))))

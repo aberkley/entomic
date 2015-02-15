@@ -54,7 +54,7 @@
     (map->CustomFormats {:parsers parsers'
                          :unparsers unparsers'})))
 
-(defrecord Datomic [q db entity transact tempid function connect history]
+(defrecord Datomic [q db entity transact tempid function connect history as-of]
  ;;holds the datomic api so that it can be injected
   component/Lifecycle
   (start [component]

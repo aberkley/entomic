@@ -1,4 +1,5 @@
 (ns entomic.rules
+  (:use [entomic.coerce])
   (:require [clojure.core.incubator :refer :all]
             [clojure.walk :refer :all]))
 
@@ -106,9 +107,9 @@
        (map (fn [rule] (into '[[entity? ?entity]] rule)))
        vec))
 
-(defn history-rules [plugins entity sets]
+(defn history-rules [plugins entity sets tx-clause]
   (->> (expand-rule plugins entity sets)
-       (map (fn [rule] (into rule '[[?transaction _ _ ?entity]])))
+       (map (fn [rule] (into rule tx-clause)))
        (map (fn [rule] (into '[[entity? ?entity ?transaction]] rule)))
        vec))
 
@@ -153,3 +154,36 @@
           sets (map (fn [ks] [ks (get-in entity ks)]) set-keys)
           sets' (map (fn [[k s]] (->> s (map (fn [v] [k v])))) sets)]
       [entity' sets'])))
+
+(defn query-type [_ q]
+  (type q))
+
+(defmulti rule query-type)
+
+(defmethod rule clojure.lang.Keyword
+  [{:keys [datomic conn]} prefix]
+  (let [{:keys [q entity db]} datomic
+        database (db conn)]
+    (->> (q '[:find ?e
+              :where
+              [?e :db/ident]]
+            database)
+         identity
+         (map first)
+         (map (partial entity database))
+         (map :db/ident)
+         (filter #(= prefix (attribute-prefix %)))
+         (map prefix-rule))))
+
+(defmethod rule :default
+  [{:keys [plugins] :as entomic} entity]
+  (let [[entity' sets] (extract-sets entity)]
+    (rules plugins entity' sets)))
+
+(defn history-rule
+  ([{:keys [plugins] :as entomic} entity & [attr value]]
+     (let [[entity' sets] (extract-sets entity)
+           attr' (or attr '_)
+           value' (or value '_)
+           tx-clause [['?entity attr' value' '?transaction]]]
+       (history-rules plugins entity' sets tx-clause))))

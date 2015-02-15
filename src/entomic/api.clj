@@ -1,5 +1,5 @@
 (ns entomic.api
-  (:require [entomic.core :only [transact! find- find-ids] :as e]
+  (:require [entomic.core :only [transact! find- find-ids find-history] :as e]
             [entomic.format :only [parse unparse unparse-entity verify-unique] :as ft]))
 
 (defn ids
@@ -48,6 +48,13 @@
   (->> x
        (f entomic)
        (ft/verify-unique x)))
+
+(defn h
+  ([entomic x & [attr value]]
+     (->> x
+          (ft/parse-entity entomic)
+          (#(e/find-history entomic % attr value))
+          (ft/unparse entomic))))
 
 (defn- commits!
   [entomic id-types entities keys attributes]
